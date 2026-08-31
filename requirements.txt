@@ -1,7 +1,7 @@
 fastapi
 uvicorn
 pydantic
-google-generativeai
+httpx
 joblib
 pandas
 scikit-learn
