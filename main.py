@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 app = FastAPI()
 
+# 1. 開放 CORS 跨域請求（避免前端 GitHub Pages 被擋）
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -15,6 +16,32 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 2. 補上根目錄 GET 測試（這樣點進網址就會顯示正常）
+@app.get("/")
+def read_root():
+    return {"status": "online", "message": "Suzuki Backend API is running!"}
+
+# 3. AI 諮詢 API 路由
+class ConsultRequest(BaseModel):
+    prompt: str
+    tpe_br: float
+    b_acid: float
+
+@app.post("/ai-consult")
+def ai_consult(data: ConsultRequest):
+    # 這邊放你的 Gemini 呼叫邏輯
+    return {"reply": f"收到問題：{data.prompt}，目前投料為 TPE-Br: {data.tpe_br}mg"}
+
+# 4. ML 產率預測 API 路由
+class PredictRequest(BaseModel):
+    tpe_br: float
+    b_acid: float
+
+@app.post("/predict")
+def predict_yield(data: PredictRequest):
+    # 這邊放你的 .pkl 模型載入與 predict 邏輯
+    return {"predicted_yield": 85.0}
 
 # 🔑 請在這裡貼上你的 Gemini API Key
 GEMINI_API_KEY = os.getenv(
