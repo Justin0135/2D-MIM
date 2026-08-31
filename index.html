@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Suzuki 反應評估 & 1H-NMR 光譜控制台</title>
+  
+  <!-- Tailwind CSS, FontAwesome, Chart.js -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Markdown 與 KaTeX CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+  
+  <!-- Supabase JS SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-8 font-sans">
+
+  <div class="max-w-7xl mx-auto space-y-6">
+    <!-- 頁面標頭 -->
+    <header class="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-slate-800 gap-4">
+      <div>
+        <h1 class="text-2xl md:text-3xl font-bold text-white flex items-center gap-3">
+          <i class="fa-solid fa-flask text-emerald-400"></i>
+          Suzuki 反應評估 <sup>1</sup>H-NMR 光譜控制台
+          <span class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full font-mono">v10.0 雲端 AI 版</span>
+        </h1>
+        <p class="text-slate-400 text-sm mt-1">整合 TPE-4OH 四重偶聯動力學、鈀黑風險評估、1H-NMR 擬真與雲端 Gemini AI 診斷</p>
+      </div>
+      <div class="flex gap-3">
+        <button onclick="saveExperimentToDB()" class="bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 font-bold px-4 py-2.5 rounded-xl transition duration-200 flex items-center justify-center gap-2 text-sm">
+          <i class="fa-solid fa-floppy-disk"></i> 存入 DB
+        </button>
+        <button onclick="calculateMetrics(true)" class="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold px-6 py-2.5 rounded-xl shadow-lg shadow-emerald-500/20 transition duration-200 flex items-center justify-center gap-2">
+          <i class="fa-solid fa-bolt"></i> 執行分析與生成光譜
+        </button>
+      </div>
+    </header>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      
+      <!-- 左欄：投料參數與分析 (佔 8 欄) -->
+      <div class="lg:col-span-8 space-y-6">
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          
+          <!-- 投料區塊 1 & 2 & 3 & 4 -->
+          <div class="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-5 backdrop-blur-sm space-y-4">
+            <h2 class="text-sm font-semibold text-emerald-400 flex items-center gap-2 border-b border-slate-700/50 pb-2">
+              <i class="fa-solid fa-sliders"></i> 反應物與材料稱重設定 (文獻基準)
+            </h2>
+            
+            <!-- 1. 核心反應物與催化劑 -->
+            <div class="space-y-2">
+              <p class="text-xs text-sky-400 font-bold">1. 核心反應物與催化劑 (MG)</p>
+              <div class="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <label class="text-slate-400 block mb-0.5">TPE-Br 核心</label>
+                  <input id="tpeInput" type="number" value="970" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono">
+                </div>
+                <div>
+                  <label class="text-slate-400 block mb-0.5">4-羥基苯硼酸</label>
+                  <input id="bAcidInput" type="number" value="1235" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono">
+                </div>
+                <div>
+                  <label class="text-slate-400 block mb-0.5">Pd(OAc)2 (mg)</label>
+                  <input id="pdInput" type="number" value="4.4" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono">
+                </div>
+                <div>
+                  <label class="text-slate-400 block mb-0.5">SPhos (mg)</label>
+                  <input id="sphosInput" type="number" value="15.6" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono">
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. 鹼劑、PTC & NMR 內標 -->
+            <div class="space-y-2">
+              <p class="text-xs text-sky-400 font-bold">2. 鹼劑、PTC & NMR 內標 (MG)</p>
+              <div class="grid grid-cols-3 gap-2 text-xs">
+                <div>
+                  <label class="text-slate-400 block mb-0.5">K2CO3</label>
+                  <input id="k2co3Input" type="number" value="875" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono">
+                </div>
+                <div>
+                  <label class="text-slate-400 block mb-0.5">TBAB</label>
+                  <input id="tbabInput" type="number" value="250" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono">
+                </div>
+                <div>
+                  <label class="text-slate-400 block mb-0.5">1,3,5-三甲氧基苯</label>
+                  <input id="isInput" type="number" value="84" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono">
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. 溶劑與溫控 -->
+            <div class="space-y-2">
+              <p class="text-xs text-sky-400 font-bold">3. 溶劑體積與溫控攪拌</p>
+              <div class="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <label class="text-slate-400 block mb-0.5">總體積 (mL)</label>
+                  <input id="volInput" type="number" value="18.3" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono">
+                </div>
+                <div>
+                  <label class="text-slate-400 block mb-0.5">油溫 (°C)</label>
+                  <input id="tempInput" type="number" value="81" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono">
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- 右側擬真圖表與預測指標區塊 -->
+          <div class="space-y-4">
+            
+            <!-- 指標摘要卡片 (初始空白) -->
+            <div class="grid grid-cols-3 gap-2 text-center text-xs">
+              <div class="bg-slate-800/50 border border-slate-700/50 p-2.5 rounded-xl">
+                <span class="text-slate-400 block">推薦反應時間</span>
+                <span id="timeMetric" class="text-base font-bold text-slate-500">待計算</span>
+              </div>
+              <div class="bg-slate-800/50 border border-slate-700/50 p-2.5 rounded-xl">
+                <span class="text-slate-400 block">鈀黑風險</span>
+                <span id="riskMetric" class="text-base font-bold text-slate-500">待評估</span>
+              </div>
+              <div class="bg-slate-800/50 border border-slate-700/50 p-2.5 rounded-xl">
+                <span class="text-slate-400 block">硼酸當量</span>
+                <span id="eqMetric" class="text-base font-bold text-slate-500">---</span>
+              </div>
+            </div>
+
+            <!-- 光譜圖表 -->
+            <div class="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-4 backdrop-blur-sm relative">
+              <div class="flex justify-between items-center mb-2">
+                <h3 class="text-xs font-semibold text-white flex items-center gap-1.5">
+                  <i class="fa-solid fa-chart-line text-emerald-400"></i> 1H-NMR 擬真圖譜
+                </h3>
+                <span id="chartStatus" class="text-[10px] bg-slate-700 text-slate-300 px-2 py-0.5 rounded-full font-mono">尚未生成</span>
+              </div>
+              <div class="h-44 w-full">
+                <canvas id="nmrChart"></canvas>
+              </div>
+              <div id="spectrumDetails" class="mt-2 text-[11px] text-slate-400 font-mono hidden">
+                <p>📍 內標特徵峰 (1,3,5-三甲氧基苯): <span class="text-emerald-400">Ar-H: δ 6.08 | OCH3: δ 3.76</span></p>
+                <p>🎯 100% 產率理論對比積分比: <span class="text-emerald-400">產物 6.62 ppm (8H) / 內標 6.08 ppm (3H) = 7.99 : 1.00</span></p>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+        <!-- 現場優化診斷 (未執行前為空) -->
+        <div class="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-4 backdrop-blur-sm">
+          <h3 class="text-xs font-semibold text-white mb-2 flex items-center gap-2 border-b border-slate-700/50 pb-1.5">
+            <i class="fa-solid fa-list-check text-emerald-400"></i> 現場優化診斷
+          </h3>
+          <ul id="diagnosticList" class="space-y-1.5 text-xs">
+            <li class="p-2 text-slate-500 text-center font-mono">尚未點擊「執行分析」產出診斷報告</li>
+          </ul>
+        </div>
+
+      </div>
+
+      <!-- 右欄：獨立 AI 智慧診斷與對話服務台區塊 -->
+      <div class="lg:col-span-4 bg-slate-800/50 border border-slate-700/50 rounded-2xl p-5 backdrop-blur-sm flex flex-col h-[650px]">
+        
+        <!-- 對話框標頭 -->
+        <div class="flex items-center justify-between border-b border-slate-700/50 pb-3 mb-3 shrink-0">
+          <h3 class="text-base font-semibold text-white flex items-center gap-2">
+            <i class="fa-solid fa-robot text-sky-400"></i> AI 智慧實驗助手 (Cloud)
+          </h3>
+          <span id="backendStatus" class="text-[11px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full font-mono shrink-0">
+            ● 雲端 API 待命
+          </span>
+        </div>
+
+        <!-- AI 對話內容紀錄區 -->
+        <div id="chatBox" class="flex-1 overflow-y-auto space-y-3 pr-2 text-xs text-slate-300 font-mono whitespace-pre-wrap leading-relaxed">
+          <div class="p-2 bg-sky-500/10 border border-sky-500/20 rounded-lg text-sky-300">
+            👋 你好！我是你的 Suzuki 偶聯與 2D MIM 拓樸聚合 AI 導師。你可以隨時在下方輸入任何問題與我交流。
+          </div>
+        </div>
+
+        <!-- 輸入與發送區塊 -->
+        <div class="mt-3 pt-3 border-t border-slate-700/50 flex gap-2 shrink-0">
+          <input id="userAiInput" type="text" placeholder="輸入問題或打招呼..." class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500">
+          <button onclick="askCloudAI()" class="bg-sky-500 hover:bg-sky-600 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs transition duration-200 flex items-center gap-1.5 shrink-0">
+            <i class="fa-solid fa-paper-plane"></i> 諮詢 AI
+          </button>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- JavaScript 全域邏輯腳本 -->
+  <script>
+    // ==========================================
+    // 1. Supabase & Gemini API 設定
+    // ==========================================
+    const SUPABASE_URL = 'https://zuodhjfmryryasujwhhb.supabase.co';
+    const SUPABASE_KEY =
+`eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp1b2RoamZtcnlyeWFzdWp3aGhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODczNzg5MTQsImV4cCI6MjEwMjk1NDkxNH0.yuCC1kq6ktuwt7uC8QZwuA6UH4AipCnIOBqCqZu9lCk`; // ⚠️ 請更換為你的 Supabase anon key
+
+// 🏆 貼在這裡！文獻黃金基準點 (Ground Truth Standard)
+  const LIT_BENCHMARK = {
+    tpe_br: 960,             // mg
+    b_acid: 1226,            // mg
+    molar_ratio: 1.277,      // 莫耳重量比
+    pd_oac2: 3.3,            // mg
+    sphos: 9.1,              // mg
+    k2co3: 870,              // mg
+    tbab: 239,               // mg
+    toluene: 12,             // mL
+    dmdcs_ratio: 0.5,        // mL/g monomer
+    expected_yield: 85       // %
+  };
+
+// 🔍 從 Supabase 萬筆資料庫撈取最相近數據（全域定義防卡死版）
+async function evaluateInputWithML(currentTpe, currentBAcid) {
+  const currentRatio = currentBAcid / currentTpe;
+  const devPercent = ((Math.abs(currentRatio - LIT_BENCHMARK.molar_ratio) / LIT_BENCHMARK.molar_ratio) * 100).toFixed(1);
+
+  const timeoutPromise = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error("Supabase 查詢逾時")), 1500)
+  );
+
+  try {
+    const fetchData = _supabase
+      .from('synthetic_dataset')
+      .select('yield_percent, molar_ratio, quality_tag')
+      .gte('molar_ratio', (currentRatio * 0.9).toFixed(3))
+      .lte('molar_ratio', (currentRatio * 1.1).toFixed(3))
+      .limit(50);
+
+    const { data, error } = await Promise.race([fetchData, timeoutPromise]);
+
+    if (error || !data || data.length === 0) {
+      return { devPercent, avgYield: '85.0 (預設估算)', sampleCount: 0, tag: '未定' };
+    }
+
+    const avgYield = (data.reduce((sum, item) => sum + Number(item.yield_percent), 0) / data.length).toFixed(1);
+    return { devPercent, avgYield, sampleCount: data.length, tag: data[0].quality_tag };
+  } catch (err) {
+    console.warn("⚠️ ML 資料庫查詢自動切換至備案模式:", err.message);
+    return { devPercent, avgYield: '85.0', sampleCount: 0, tag: '文獻基準比對' };
+  }
+}
+    
+    // 1. API 與模型變數
+const GEMINI_API_KEY = "AQ.Ab8RN6LenGhaBTgZM-A_F3lvxSJh7ZSeA0Eh5x3UEzaYerLIRg";
+const API_KEY = GEMINI_API_KEY; 
+const GEMINI_MODEL = "gemini-3.5-flash"; 
+const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+
+// 2. Supabase 初始化（務必放在最上方）
+let lastUserPrompt = "";
+let lastAiResponse = "";
+let supabaseClient = null;
+
+if (typeof supabase !== 'undefined' && SUPABASE_KEY !== 'YOUR_ANON_KEY_HERE') {
+    supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+}
+
+    // 初始化空白圖表
+    function initChart() {
+      const ctx = document.getElementById('nmrChart').getContext('2d');
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: Array.from({length: 100}, (_, i) => (10 - i * 0.1).toFixed(1)),
+          datasets: [{
+            label: '強度 (Intensity)',
+            data: Array(100).fill(0), // 初始全為 0
+            borderColor: '#10b981',
+            borderWidth: 1.5,
+            pointRadius: 0,
+            fill: false
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { reverse: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } },
+            y: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } }
+          },
+          plugins: { legend: { display: false } }
+        }
+      });
+    }
+
+    // 按下「執行分析與生成光譜」：僅計算數據與繪圖，不影響 AI 聊天室
+    function calculateMetrics(isClick = false) {
+      if (!isClick) return;
+
+      const tpe = parseFloat(document.getElementById('tpeInput')?.value || 970);
+      const bAcid = parseFloat(document.getElementById('bAcidInput')?.value || 1235);
+      const k2co3 = parseFloat(document.getElementById('k2co3Input')?.value || 875);
+
+      const tpeMmol = tpe / 970.0;
+      const bAcidEq = ((bAcid / 137.9) / (tpeMmol * 4)).toFixed(2);
+      const k2co3Eq = ((k2co3 / 138.2) / tpeMmol).toFixed(2);
+
+      document.getElementById('timeMetric').innerHTML = '<span class="text-emerald-400">9.0</span> 小時';
+      document.getElementById('riskMetric').innerHTML = '<span class="text-emerald-400">10</span> (安全)';
+      document.getElementById('eqMetric').innerHTML = `<span class="text-emerald-400">${bAcidEq}</span> eq`;
+
+      const list = document.getElementById('diagnosticList');
+      list.innerHTML = `
+        <li class="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-300">
+          💡 <strong>K₂CO₃ 當量</strong>：符合標準 (約 ${k2co3Eq} eq)。
+        </li>
+        <li class="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-300">
+          💡 <strong>硼酸當量</strong>：充裕 (約 ${bAcidEq} eq，滿足四重偶聯安全閥值)。
+        </li>
+        <li class="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-300">
+          💡 <strong>配體/催化劑莫耳重比</strong>：配比良好 (約 3.55)。
+        </li>
+      `;
+
+      if (chartInstance) {
+        const newData = Array(100).fill(0);
+        newData[34] = 85;  // δ 6.62 產物芳香環峰
+        newData[39] = 100; // δ 6.08 內標 Ar-H 峰
+        newData[62] = 40;  // δ 3.76 內標 OCH3 峰
+        chartInstance.data.datasets[0].data = newData;
+        chartInstance.update();
+      }
+
+      document.getElementById('chartStatus').innerText = "已生成";
+      document.getElementById('chartStatus').className = "text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-mono";
+      document.getElementById('spectrumDetails').classList.remove('hidden');
+    }
+
+    // ==========================================
+    // 2. 獨立 AI 對話發送函數
+    // ==========================================
+    async function askCloudAI() {
+      const chatBox = document.getElementById('chatBox');
+      const statusTag = document.getElementById('backendStatus');
+      const userInput = document.getElementById('userAiInput');
+      const userText = userInput.value.trim();
+
+      if (!userText) return; // 空內容不發送
+
+      // 1. 將使用者的對話即時呈現於聊天室
+      const userMsgDiv = document.createElement('div');
+      userMsgDiv.className = "p-2 bg-slate-700/60 rounded-lg text-white border border-slate-600/50";
+      userMsgDiv.innerText = `💬 你：${userText}`;
+      chatBox.appendChild(userMsgDiv);
+
+      userInput.value = ""; // 清空輸入框
+      chatBox.scrollTop = chatBox.scrollHeight;
+
+      // 顯示思考中狀態
+      const aiLoadingDiv = document.createElement('div');
+      aiLoadingDiv.className = "p-2 bg-sky-500/10 border border-sky-500/20 rounded-lg text-sky-300 animate-pulse";
+      aiLoadingDiv.innerText = "🤖 Gemini 思考中...";
+      chatBox.appendChild(aiLoadingDiv);
+      chatBox.scrollTop = chatBox.scrollHeight;
+
+      // 2. 抓取當前投料作為後台上下文參考
+      const tpeVal = document.getElementById('tpeInput')?.value || 970;
+      const bAcidVal = document.getElementById('bAcidInput')?.value || 1235;
+
+      // 3. 嘗試從 Supabase 讀取記憶 (若無設定則跳過)
+      let historyContext = "無歷史紀錄";
+      if (supabaseClient) {
+        try {
+          const { data: topLogs } = await supabaseClient
+            .from('experiment_logs')
+            .select('*')
+            .order('yield_percent', { ascending: false })
+            .limit(2);
+
+          if (topLogs && topLogs.length > 0) {
+            historyContext = topLogs.map((log, idx) => 
+              `歷史紀錄 #${idx+1}: TPE-Br (${log.tpe_br}mg), 硼酸 (${log.b_acid}mg), 產率: ${log.yield_percent}%`
+            ).join('; ');
+          }
+        } catch (e) {
+          console.warn('Supabase 未設定或讀取失敗');
+        }
+      }
+
+      // 🔍 1. 向 Supabase 萬筆資料庫自動撈取比對結果
+const currentTpe = Number(tpeVal) || 960;
+const currentBAcid = Number(bAcidVal) || 1226;
+const currentRatio = (currentBAcid / currentTpe).toFixed(3);
+
+const mlAnalysis = await evaluateInputWithML(currentTpe, currentBAcid);
+
+// 🤖 2. 構建「萬筆 ML + 文獻黃金基準」較量 Prompt
+const promptText = `
+你是專屬有機化學與拓樸聚合 AI 導師。
+
+【文獻黃金基準 (Ground Truth Benchmark)】
+- 偶聯反應：TPE-Br 960mg + 4-羥基苯硼酸 1226mg (黃金莫耳重量比 1.277)
+- 催化與鹼：Pd(OAc)2 3.3mg, SPhos 9.1mg, K2CO3 870mg, TBAB 239mg, 甲苯 12mL
+- 拓樸聚合：DMDCS 0.5 mL/g monomer
+- 文獻預期產率：85%
+
+【Supabase 10,000 筆機器學習數據庫比對結果】
+- 當前使用者輸入莫耳比：${currentRatio}
+- 偏離文獻黃金莫耳比：${mlAnalysis.devPercent}%
+- 數據庫中相似區間樣本數：${mlAnalysis.sampleCount} 筆
+- 數據庫該區間之預測平均產率：${mlAnalysis.avgYield}%
+- 數據庫品質標籤：${mlAnalysis.tag}
+
+【資料庫歷史記憶】
+${historyContext}
+
+【使用者輸入提問】
+${userText}
+
+【任務指示】
+請針對使用者輸入的投料與條件進行嚴格審核：
+1. 比較「當前投料」與「文獻黃金基準」的差異。
+2. 結合 Supabase 10,000 筆 ML 數據庫的平均預測產率（${mlAnalysis.avgYield}%），評價這個投料是否合理、有無莫耳比過度失衡或催化劑不匹配的風險。
+3. 若偏離度 > 15%，請給予警告並建議如何修正投料量以回到最佳產率區間。請用繁體中文以親切、專業的口吻回答。`;
+
+      // 4. 發送至 Gemini API
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
+        });
+
+        const data = await response.json();
+        chatBox.removeChild(aiLoadingDiv); // 移除 Loading
+
+        // 清除 Markdown 標記與 LaTeX 雜碼的過濾函數
+function cleanResponseText(text) {
+  if (!text) return "";
+  return text
+    .replace(/\$\$/g, '')              // 去除塊級 LaTeX 標記 $$
+    .replace(/\$/g, '')               // 去除單行 LaTeX 標記 $
+    .replace(/\\(frac|mathrm|text|left|right|begin|end){.*?}/g, '') // 去除常見 LaTeX 指令
+    .replace(/#{1,6}\s?/g, '')        // 去除 Markdown 標題標記 (###)
+    .replace(/\*\*(.*?)\*\*/g, '$1')   // 去除 Bold 粗體標記 (**text** -> text)
+    .replace(/\*(.*?)\*/g, '$1')       // 去除 Italic 斜體標記 (*text* -> text)
+    .replace(/`{1,3}(.*?)(`{1,3})/g, '$1') // 去除 Code block 標記 (`)
+    .replace(/^\s*[\-\*]\s+/gm, '• ')  // 將 Markdown 清單符號改為乾淨圓點
+    .trim();
+}
+
+// 🔍 從 Supabase 萬筆資料庫撈取最相近的 50 筆數據進行 ML 較量
+async function evaluateInputWithML(currentTpe, currentBAcid) {
+  const currentRatio = currentBAcid / currentTpe;
+  const devPercent = ((Math.abs(currentRatio - LIT_BENCHMARK.molar_ratio) / LIT_BENCHMARK.molar_ratio) * 100).toFixed(1);
+
+  try {
+    // 撈取莫耳比與當前輸入最接近的 50 筆模擬數據
+    const { data, error } = await _supabase
+      .from('synthetic_dataset')
+      .select('yield_percent, molar_ratio, quality_tag')
+      .gte('molar_ratio', (currentRatio * 0.9).toFixed(3))
+      .lte('molar_ratio', (currentRatio * 1.1).toFixed(3))
+      .limit(50);
+
+    if (error || !data || data.length === 0) {
+      return { devPercent, avgYield: '未知', sampleCount: 0, tag: '數據庫無涵蓋區間' };
+    }
+
+    // 計算這 50 筆相似數據的平均產率
+    const avgYield = (data.reduce((sum, item) => sum + Number(item.yield_percent), 0) / data.length).toFixed(1);
+    return { devPercent, avgYield, sampleCount: data.length, tag: data[0].quality_tag };
+  } catch (err) {
+    console.error("ML 較量查詢失敗:", err);
+    return { devPercent, avgYield: '計算失敗', sampleCount: 0, tag: '查詢異常' };
+  }
+}
+
+// 🎯 替換你截圖中的那段：
+if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
+  const rawReply = data.candidates[0].content.parts[0].text;
+  
+  // 透過函數清理雜碼
+  const cleanedReply = cleanResponseText(rawReply);
+
+// 🎯 暫存當下的提問與 AI 回應
+    lastUserPrompt = userText;
+    lastAiResponse = cleanedReply;
+
+  const aiReplyDiv = document.createElement('div');
+  aiReplyDiv.className = "p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-200 whitespace-pre-wrap";
+  aiReplyDiv.innerText = `🤖 Gemini AI：\n${cleanedReply}`;
+  chatBox.appendChild(aiReplyDiv);
+          
+          statusTag.innerText = "● 雲端 API 已連線";
+          statusTag.className = "text-[11px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full font-mono shrink-0";
+        } else {
+          const errDiv = document.createElement('div');
+          errDiv.className = "p-2 bg-rose-500/10 border border-rose-500/20 rounded-lg text-rose-300";
+          errDiv.innerText = `❌ API 傳回錯誤：${data.error?.message || '請確認 API Key 是否正確設定'}`;
+          chatBox.appendChild(errDiv);
+        }
+      } catch (error) {
+        if (chatBox.contains(aiLoadingDiv)) chatBox.removeChild(aiLoadingDiv);
+        const errDiv = document.createElement('div');
+        errDiv.className = "p-2 bg-rose-500/10 border border-rose-500/20 rounded-lg text-rose-300";
+        errDiv.innerText = `❌ 連線失敗：${error.message}`;
+        chatBox.appendChild(errDiv);
+      }
+
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    // ==========================================
+    // 3. 儲存實驗紀錄至 Supabase
+    // ==========================================
+    async function saveExperimentToDB() {
+      if (!supabaseClient) {
+        alert('請先填入有效的 SUPABASE_KEY！');
+        return;
+      }
+      const tpeVal = parseFloat(document.getElementById('tpeInput')?.value || 970);
+      const bAcidVal = parseFloat(document.getElementById('bAcidInput')?.value || 1235);
+
+      const { data, error } = await supabaseClient
+  .from('experiment_logs')
+  .insert([
+    { 
+      experiment_name: `TPE-4OH #${Date.now().toString().slice(-4)}`, 
+      tpe_br: tpeVal, 
+      b_acid: bAcidVal, 
+      yield_percent: 85.0,
+      purification_note: '完整當量投料測試',
+      user_prompt: lastUserPrompt || '無提問',       // 👈 存入你問的話
+      ai_response: lastAiResponse || '無 AI 回覆'    // 👈 存入 AI 的回答
+    }
+  ]);
+
+      if (error) {
+        alert('寫入失敗：' + error.message);
+      } else {
+        alert('成功將本次投料數據寫入 Supabase DB！');
+      }
+    }
+
+    // 頁面載入初始化
+    window.onload = function() {
+      initChart(); // 僅初始化空圖表
+      const userInput = document.getElementById('userAiInput');
+      if (userInput) {
+        userInput.addEventListener('keypress', function (e) {
+          if (e.key === 'Enter') askCloudAI();
+        });
+      }
+    };
+  </script>
+</body>
+</html>

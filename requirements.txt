@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+google-genai
+joblib
+scikit-learn
+pydantic
