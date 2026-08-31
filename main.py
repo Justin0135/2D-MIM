@@ -5,8 +5,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from google import genai
-from google.genai import types
+import google.generativeai as genai  # 使用經典官方 SDK
 
 app = FastAPI()
 
@@ -60,7 +59,7 @@ def predict_yield(data: PredictRequest):
         return {"predicted_yield": 85.0, "status": "error", "detail": str(e)}
 
 
-# 5. AI 智慧診斷諮詢接口 (修復 401 認證問題)
+# 5. AI 智慧診斷諮詢接口 (使用 google-generativeai 強制 API Key 驗證)
 class ConsultRequest(BaseModel):
     prompt: str
     tpe_br: float
@@ -76,8 +75,8 @@ def ai_consult(data: ConsultRequest):
         )
     
     try:
-        # 強制明確使用 API Key 初始化 Client
-        client = genai.Client(api_key=api_key)
+        # 設定 API Key
+        genai.configure(api_key=api_key)
 
         system_instruction = (
             "你是一位 Suzuki 偶聯反應與 2D MIM 拓樸聚合專家。"
@@ -91,13 +90,14 @@ def ai_consult(data: ConsultRequest):
             f"【使用者提問】\n{data.prompt}"
         )
 
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=user_context,
-            config=types.GenerateContentConfig(
-                system_instruction=system_instruction
-            )
+        # 初始化模型
+        generative_model = genai.GenerativeModel(
+            model_name="gemini-1.5-flash",
+            system_instruction=system_instruction
         )
+
+        response = generative_model.generate_content(user_context)
         return {"reply": response.text}
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Gemini API 呼叫失敗: {str(e)}")
