@@ -1,4 +1,71 @@
-# 5. AI 智慧診斷諮詢接口 (支援新版 AQ. 金鑰與 x-goog-api-key Header)
+import os
+import httpx
+import joblib
+import pandas as pd
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from pydantic import BaseModel  # <--- 就是漏了這行！
+
+app = FastAPI()
+
+# 1. 開放 CORS 跨域存取
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# 2. 全域模型變數 (延遲載入)
+model = None
+
+def get_model():
+    global model
+    if model is None:
+        MODEL_PATH = "suzuki_model.pkl"
+        if os.path.exists(MODEL_PATH):
+            try:
+                model = joblib.load(MODEL_PATH)
+                print("✅ suzuki_model.pkl 成功載入！")
+            except Exception as e:
+                print(f"⚠️ 載入 suzuki_model.pkl 失敗: {e}")
+    return model
+
+
+# 3. 首頁路由：回傳 index.html 畫面
+@app.get("/")
+def read_root():
+    if os.path.exists("index.html"):
+        return FileResponse("index.html")
+    return {"status": "online", "message": "Backend API is running!"}
+
+
+# 4. ML 產率預測接口
+class PredictRequest(BaseModel):
+    tpe_br: float
+    b_acid: float
+
+@app.post("/predict")
+def predict_yield(data: PredictRequest):
+    mdl = get_model()
+    if mdl is None:
+        return {"predicted_yield": 85.0, "status": "fallback"}
+    
+    try:
+        input_data = pd.DataFrame([{
+            "tpe_br": data.tpe_br,
+            "b_acid": data.b_acid
+        }])
+        prediction = mdl.predict(input_data)[0]
+        return {"predicted_yield": float(prediction), "status": "success"}
+    except Exception as e:
+        print(f"預測出錯: {e}")
+        return {"predicted_yield": 85.0, "status": "error", "detail": str(e)}
+
+
+# 5. AI 智慧診斷諮詢接口 (使用 x-goog-api-key 驗證，解決 401 錯誤)
 class ConsultRequest(BaseModel):
     prompt: str
     tpe_br: float
@@ -13,7 +80,6 @@ async def ai_consult(data: ConsultRequest):
             detail="後端未偵測到 GEMINI_API_KEY 環境變數，請至 Render Environment 設定。"
         )
     
-    # 自動清除 Key 前後可能誤複製到的空白與雙單引號
     clean_api_key = api_key.strip().strip('"').strip("'")
     
     system_instruction = (
@@ -28,10 +94,8 @@ async def ai_consult(data: ConsultRequest):
         f"【使用者提問】\n{data.prompt}"
     )
 
-    # 1. 網址不要掛 ?key= (避免 AQ. 金鑰被 Google API Gateway 誤判為 OAuth Token)
     url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
 
-    # 2. 強制使用 Google 規範的 x-goog-api-key Header
     headers = {
         "Content-Type": "application/json",
         "x-goog-api-key": clean_api_key
