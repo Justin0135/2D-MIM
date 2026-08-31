@@ -94,7 +94,7 @@ async def ai_consult(data: ConsultRequest):
         f"【使用者提問】\n{data.prompt}"
     )
 
-    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent"
 
     headers = {
         "Content-Type": "application/json",
