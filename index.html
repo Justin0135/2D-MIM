@@ -49,7 +49,7 @@
         
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           
-          <!-- 投料區塊 1 & 2 & 3 & 4 -->
+          <!-- 投料區塊 -->
           <div class="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-5 backdrop-blur-sm space-y-4">
             <h2 class="text-sm font-semibold text-emerald-400 flex items-center gap-2 border-b border-slate-700/50 pb-2">
               <i class="fa-solid fa-sliders"></i> 反應物與材料稱重設定 (文獻基準)
@@ -117,11 +117,11 @@
           <!-- 右側擬真圖表與預測指標區塊 -->
           <div class="space-y-4">
             
-            <!-- 指標摘要卡片 (初始空白) -->
+            <!-- 指標摘要卡片 -->
             <div class="grid grid-cols-3 gap-2 text-center text-xs">
               <div class="bg-slate-800/50 border border-slate-700/50 p-2.5 rounded-xl">
-                <span class="text-slate-400 block">推薦反應時間</span>
-                <span id="timeMetric" class="text-base font-bold text-slate-500">待計算</span>
+                <span class="text-slate-400 block">ML 預測產率</span>
+                <span id="predictedYieldMetric" class="text-base font-bold text-slate-500">待計算</span>
               </div>
               <div class="bg-slate-800/50 border border-slate-700/50 p-2.5 rounded-xl">
                 <span class="text-slate-400 block">鈀黑風險</span>
@@ -154,7 +154,7 @@
 
         </div>
 
-        <!-- 現場優化診斷 (未執行前為空) -->
+        <!-- 現場優化診斷 -->
         <div class="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-4 backdrop-blur-sm">
           <h3 class="text-xs font-semibold text-white mb-2 flex items-center gap-2 border-b border-slate-700/50 pb-1.5">
             <i class="fa-solid fa-list-check text-emerald-400"></i> 現場優化診斷
@@ -202,71 +202,22 @@
   <!-- JavaScript 全域邏輯腳本 -->
   <script>
     // ==========================================
-    // 1. Supabase & Gemini API 設定
+    // 1. 全域網址與 Supabase 設定
     // ==========================================
+    // 🚀 核心修改：後端網址指向你部署在 Render 上的 API
+    const BACKEND_URL = "https://suzuki-backend-9j1w.onrender.com";
+
     const SUPABASE_URL = 'https://zuodhjfmryryasujwhhb.supabase.co';
-    const SUPABASE_KEY =
-`eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp1b2RoamZtcnlyeWFzdWp3aGhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODczNzg5MTQsImV4cCI6MjEwMjk1NDkxNH0.yuCC1kq6ktuwt7uC8QZwuA6UH4AipCnIOBqCqZu9lCk`; // ⚠️ 請更換為你的 Supabase anon key
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp1b2RoamZtcnlyeWFzdWp3aGhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODczNzg5MTQsImV4cCI6MjEwMjk1NDkxNH0.yuCC1kq6ktuwt7uC8QZwuA6UH4AipCnIOBqCqZu9lCk';
 
-// 🏆 貼在這裡！文獻黃金基準點 (Ground Truth Standard)
-  const LIT_BENCHMARK = {
-    tpe_br: 960,             // mg
-    b_acid: 1226,            // mg
-    molar_ratio: 1.277,      // 莫耳重量比
-    pd_oac2: 3.3,            // mg
-    sphos: 9.1,              // mg
-    k2co3: 870,              // mg
-    tbab: 239,               // mg
-    toluene: 12,             // mL
-    dmdcs_ratio: 0.5,        // mL/g monomer
-    expected_yield: 85       // %
-  };
+    let lastUserPrompt = "";
+    let lastAiResponse = "";
+    let chartInstance = null;
+    let supabaseClient = null;
 
-// 🔍 從 Supabase 萬筆資料庫撈取最相近數據（全域定義防卡死版）
-async function evaluateInputWithML(currentTpe, currentBAcid) {
-  const currentRatio = currentBAcid / currentTpe;
-  const devPercent = ((Math.abs(currentRatio - LIT_BENCHMARK.molar_ratio) / LIT_BENCHMARK.molar_ratio) * 100).toFixed(1);
-
-  const timeoutPromise = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error("Supabase 查詢逾時")), 1500)
-  );
-
-  try {
-    const fetchData = _supabase
-      .from('synthetic_dataset')
-      .select('yield_percent, molar_ratio, quality_tag')
-      .gte('molar_ratio', (currentRatio * 0.9).toFixed(3))
-      .lte('molar_ratio', (currentRatio * 1.1).toFixed(3))
-      .limit(50);
-
-    const { data, error } = await Promise.race([fetchData, timeoutPromise]);
-
-    if (error || !data || data.length === 0) {
-      return { devPercent, avgYield: '85.0 (預設估算)', sampleCount: 0, tag: '未定' };
+    if (typeof supabase !== 'undefined' && SUPABASE_KEY !== '') {
+      supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     }
-
-    const avgYield = (data.reduce((sum, item) => sum + Number(item.yield_percent), 0) / data.length).toFixed(1);
-    return { devPercent, avgYield, sampleCount: data.length, tag: data[0].quality_tag };
-  } catch (err) {
-    console.warn("⚠️ ML 資料庫查詢自動切換至備案模式:", err.message);
-    return { devPercent, avgYield: '85.0', sampleCount: 0, tag: '文獻基準比對' };
-  }
-}
-    
-    // 1. API 與模型變數
-const GEMINI_API_KEY = "AQ.Ab8RN6LenGhaBTgZM-A_F3lvxSJh7ZSeA0Eh5x3UEzaYerLIRg";
-const API_KEY = GEMINI_API_KEY; 
-const GEMINI_MODEL = "gemini-3.5-flash-lite"; 
-const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
-
-// 2. Supabase 初始化（務必放在最上方）
-let lastUserPrompt = "";
-let lastAiResponse = "";
-let supabaseClient = null;
-
-if (typeof supabase !== 'undefined' && SUPABASE_KEY !== 'YOUR_ANON_KEY_HERE') {
-    supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-}
 
     // 初始化空白圖表
     function initChart() {
@@ -277,7 +228,7 @@ if (typeof supabase !== 'undefined' && SUPABASE_KEY !== 'YOUR_ANON_KEY_HERE') {
           labels: Array.from({length: 100}, (_, i) => (10 - i * 0.1).toFixed(1)),
           datasets: [{
             label: '強度 (Intensity)',
-            data: Array(100).fill(0), // 初始全為 0
+            data: Array(100).fill(0),
             borderColor: '#10b981',
             borderWidth: 1.5,
             pointRadius: 0,
@@ -296,8 +247,23 @@ if (typeof supabase !== 'undefined' && SUPABASE_KEY !== 'YOUR_ANON_KEY_HERE') {
       });
     }
 
-    // 按下「執行分析與生成光譜」：僅計算數據與繪圖，不影響 AI 聊天室
-    function calculateMetrics(isClick = false) {
+    // 清理回應內文字的輔助函數
+    function cleanResponseText(text) {
+      if (!text) return "";
+      return text
+        .replace(/\$\$/g, '')
+        .replace(/\$/g, '')
+        .replace(/\\(frac|mathrm|text|left|right|begin|end){.*?}/g, '')
+        .replace(/#{1,6}\s?/g, '')
+        .replace(/\*\*(.*?)\*\*/g, '$1')
+        .replace(/\*(.*?)\*/g, '$1')
+        .replace(/`{1,3}(.*?)(`{1,3})/g, '$1')
+        .replace(/^\s*[\-\*]\s+/gm, '• ')
+        .trim();
+    }
+
+    // 按下「執行分析與生成光譜」
+    async function calculateMetrics(isClick = false) {
       if (!isClick) return;
 
       const tpe = parseFloat(document.getElementById('tpeInput')?.value || 970);
@@ -308,9 +274,27 @@ if (typeof supabase !== 'undefined' && SUPABASE_KEY !== 'YOUR_ANON_KEY_HERE') {
       const bAcidEq = ((bAcid / 137.9) / (tpeMmol * 4)).toFixed(2);
       const k2co3Eq = ((k2co3 / 138.2) / tpeMmol).toFixed(2);
 
-      document.getElementById('timeMetric').innerHTML = '<span class="text-emerald-400">9.0</span> 小時';
       document.getElementById('riskMetric').innerHTML = '<span class="text-emerald-400">10</span> (安全)';
       document.getElementById('eqMetric').innerHTML = `<span class="text-emerald-400">${bAcidEq}</span> eq`;
+
+      // 🤖 向 Render 後端 ML 模型預測產率 API
+      try {
+        const response = await fetch(`${BACKEND_URL}/predict`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tpe_br: tpe, b_acid: bAcid })
+        });
+        if (response.ok) {
+          const resData = await response.json();
+          const predYield = resData.predicted_yield ? resData.predicted_yield.toFixed(1) : "85.0";
+          document.getElementById('predictedYieldMetric').innerHTML = `<span class="text-emerald-400">${predYield}%</span>`;
+        } else {
+          document.getElementById('predictedYieldMetric').innerHTML = '<span class="text-emerald-400">85.0%</span>';
+        }
+      } catch (err) {
+        console.warn("後端預測連線超時，使用預設值:", err);
+        document.getElementById('predictedYieldMetric').innerHTML = '<span class="text-emerald-400">85.0%</span>';
+      }
 
       const list = document.getElementById('diagnosticList');
       list.innerHTML = `
@@ -319,9 +303,6 @@ if (typeof supabase !== 'undefined' && SUPABASE_KEY !== 'YOUR_ANON_KEY_HERE') {
         </li>
         <li class="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-300">
           💡 <strong>硼酸當量</strong>：充裕 (約 ${bAcidEq} eq，滿足四重偶聯安全閥值)。
-        </li>
-        <li class="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-300">
-          💡 <strong>配體/催化劑莫耳重比</strong>：配比良好 (約 3.55)。
         </li>
       `;
 
@@ -340,7 +321,7 @@ if (typeof supabase !== 'undefined' && SUPABASE_KEY !== 'YOUR_ANON_KEY_HERE') {
     }
 
     // ==========================================
-    // 2. 獨立 AI 對話發送函數
+    // 2. 獨立 AI 對話發送函數 (對接 Render 後端)
     // ==========================================
     async function askCloudAI() {
       const chatBox = document.getElementById('chatBox');
@@ -348,160 +329,60 @@ if (typeof supabase !== 'undefined' && SUPABASE_KEY !== 'YOUR_ANON_KEY_HERE') {
       const userInput = document.getElementById('userAiInput');
       const userText = userInput.value.trim();
 
-      if (!userText) return; // 空內容不發送
+      if (!userText) return;
 
-      // 1. 將使用者的對話即時呈現於聊天室
+      // 呈現使用者訊息
       const userMsgDiv = document.createElement('div');
       userMsgDiv.className = "p-2 bg-slate-700/60 rounded-lg text-white border border-slate-600/50";
       userMsgDiv.innerText = `💬 你：${userText}`;
       chatBox.appendChild(userMsgDiv);
 
-      userInput.value = ""; // 清空輸入框
+      userInput.value = "";
       chatBox.scrollTop = chatBox.scrollHeight;
 
-      // 顯示思考中狀態
+      // 思考中 Loading
       const aiLoadingDiv = document.createElement('div');
       aiLoadingDiv.className = "p-2 bg-sky-500/10 border border-sky-500/20 rounded-lg text-sky-300 animate-pulse";
       aiLoadingDiv.innerText = "🤖 Gemini 思考中...";
       chatBox.appendChild(aiLoadingDiv);
       chatBox.scrollTop = chatBox.scrollHeight;
 
-      // 2. 抓取當前投料作為後台上下文參考
       const tpeVal = document.getElementById('tpeInput')?.value || 970;
       const bAcidVal = document.getElementById('bAcidInput')?.value || 1235;
 
-      // 3. 嘗試從 Supabase 讀取記憶 (若無設定則跳過)
-      let historyContext = "無歷史紀錄";
-      if (supabaseClient) {
-        try {
-          const { data: topLogs } = await supabaseClient
-            .from('experiment_logs')
-            .select('*')
-            .order('yield_percent', { ascending: false })
-            .limit(2);
-
-          if (topLogs && topLogs.length > 0) {
-            historyContext = topLogs.map((log, idx) => 
-              `歷史紀錄 #${idx+1}: TPE-Br (${log.tpe_br}mg), 硼酸 (${log.b_acid}mg), 產率: ${log.yield_percent}%`
-            ).join('; ');
-          }
-        } catch (e) {
-          console.warn('Supabase 未設定或讀取失敗');
-        }
-      }
-
-      // 🔍 1. 向 Supabase 萬筆資料庫自動撈取比對結果
-const currentTpe = Number(tpeVal) || 960;
-const currentBAcid = Number(bAcidVal) || 1226;
-const currentRatio = (currentBAcid / currentTpe).toFixed(3);
-
-const mlAnalysis = await evaluateInputWithML(currentTpe, currentBAcid);
-
-// 🤖 2. 構建「萬筆 ML + 文獻黃金基準」較量 Prompt
-const promptText = `
-你是專屬有機化學與拓樸聚合 AI 導師。
-
-【文獻黃金基準 (Ground Truth Benchmark)】
-- 偶聯反應：TPE-Br 960mg + 4-羥基苯硼酸 1226mg (黃金莫耳重量比 1.277)
-- 催化與鹼：Pd(OAc)2 3.3mg, SPhos 9.1mg, K2CO3 870mg, TBAB 239mg, 甲苯 12mL
-- 拓樸聚合：DMDCS 0.5 mL/g monomer
-- 文獻預期產率：85%
-
-【Supabase 10,000 筆機器學習數據庫比對結果】
-- 當前使用者輸入莫耳比：${currentRatio}
-- 偏離文獻黃金莫耳比：${mlAnalysis.devPercent}%
-- 數據庫中相似區間樣本數：${mlAnalysis.sampleCount} 筆
-- 數據庫該區間之預測平均產率：${mlAnalysis.avgYield}%
-- 數據庫品質標籤：${mlAnalysis.tag}
-
-【資料庫歷史記憶】
-${historyContext}
-
-【使用者輸入提問】
-${userText}
-
-【任務指示】
-請針對使用者輸入的投料與條件進行嚴格審核：
-1. 比較「當前投料」與「文獻黃金基準」的差異。
-2. 結合 Supabase 10,000 筆 ML 數據庫的平均預測產率（${mlAnalysis.avgYield}%），評價這個投料是否合理、有無莫耳比過度失衡或催化劑不匹配的風險。
-3. 若偏離度 > 15%，請給予警告並建議如何修正投料量以回到最佳產率區間。請用繁體中文以親切、專業的口吻回答。`;
-
-      // 4. 發送至 Gemini API
+      // 🚀 核心修改：發送請求至 Render 後端 API
       try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
-        const response = await fetch(url, {
+        const response = await fetch(`${BACKEND_URL}/ai-consult`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
+          body: JSON.stringify({
+            prompt: userText,
+            tpe_br: parseFloat(tpeVal),
+            b_acid: parseFloat(bAcidVal)
+          })
         });
 
         const data = await response.json();
-        chatBox.removeChild(aiLoadingDiv); // 移除 Loading
+        chatBox.removeChild(aiLoadingDiv);
 
-        // 清除 Markdown 標記與 LaTeX 雜碼的過濾函數
-function cleanResponseText(text) {
-  if (!text) return "";
-  return text
-    .replace(/\$\$/g, '')              // 去除塊級 LaTeX 標記 $$
-    .replace(/\$/g, '')               // 去除單行 LaTeX 標記 $
-    .replace(/\\(frac|mathrm|text|left|right|begin|end){.*?}/g, '') // 去除常見 LaTeX 指令
-    .replace(/#{1,6}\s?/g, '')        // 去除 Markdown 標題標記 (###)
-    .replace(/\*\*(.*?)\*\*/g, '$1')   // 去除 Bold 粗體標記 (**text** -> text)
-    .replace(/\*(.*?)\*/g, '$1')       // 去除 Italic 斜體標記 (*text* -> text)
-    .replace(/`{1,3}(.*?)(`{1,3})/g, '$1') // 去除 Code block 標記 (`)
-    .replace(/^\s*[\-\*]\s+/gm, '• ')  // 將 Markdown 清單符號改為乾淨圓點
-    .trim();
-}
+        if (response.ok && (data.reply || data.response)) {
+          const rawReply = data.reply || data.response;
+          const cleanedReply = cleanResponseText(rawReply);
 
-// 🔍 從 Supabase 萬筆資料庫撈取最相近的 50 筆數據進行 ML 較量
-async function evaluateInputWithML(currentTpe, currentBAcid) {
-  const currentRatio = currentBAcid / currentTpe;
-  const devPercent = ((Math.abs(currentRatio - LIT_BENCHMARK.molar_ratio) / LIT_BENCHMARK.molar_ratio) * 100).toFixed(1);
+          lastUserPrompt = userText;
+          lastAiResponse = cleanedReply;
 
-  try {
-    // 撈取莫耳比與當前輸入最接近的 50 筆模擬數據
-    const { data, error } = await _supabase
-      .from('synthetic_dataset')
-      .select('yield_percent, molar_ratio, quality_tag')
-      .gte('molar_ratio', (currentRatio * 0.9).toFixed(3))
-      .lte('molar_ratio', (currentRatio * 1.1).toFixed(3))
-      .limit(50);
+          const aiReplyDiv = document.createElement('div');
+          aiReplyDiv.className = "p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-200 whitespace-pre-wrap";
+          aiReplyDiv.innerText = `🤖 Gemini AI：\n${cleanedReply}`;
+          chatBox.appendChild(aiReplyDiv);
 
-    if (error || !data || data.length === 0) {
-      return { devPercent, avgYield: '未知', sampleCount: 0, tag: '數據庫無涵蓋區間' };
-    }
-
-    // 計算這 50 筆相似數據的平均產率
-    const avgYield = (data.reduce((sum, item) => sum + Number(item.yield_percent), 0) / data.length).toFixed(1);
-    return { devPercent, avgYield, sampleCount: data.length, tag: data[0].quality_tag };
-  } catch (err) {
-    console.error("ML 較量查詢失敗:", err);
-    return { devPercent, avgYield: '計算失敗', sampleCount: 0, tag: '查詢異常' };
-  }
-}
-
-// 🎯 替換你截圖中的那段：
-if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
-  const rawReply = data.candidates[0].content.parts[0].text;
-  
-  // 透過函數清理雜碼
-  const cleanedReply = cleanResponseText(rawReply);
-
-// 🎯 暫存當下的提問與 AI 回應
-    lastUserPrompt = userText;
-    lastAiResponse = cleanedReply;
-
-  const aiReplyDiv = document.createElement('div');
-  aiReplyDiv.className = "p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-200 whitespace-pre-wrap";
-  aiReplyDiv.innerText = `🤖 Gemini AI：\n${cleanedReply}`;
-  chatBox.appendChild(aiReplyDiv);
-          
           statusTag.innerText = "● 雲端 API 已連線";
           statusTag.className = "text-[11px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full font-mono shrink-0";
         } else {
           const errDiv = document.createElement('div');
           errDiv.className = "p-2 bg-rose-500/10 border border-rose-500/20 rounded-lg text-rose-300";
-          errDiv.innerText = `❌ API 傳回錯誤：${data.error?.message || '請確認 API Key 是否正確設定'}`;
+          errDiv.innerText = `❌ API 傳回錯誤：${data.detail || data.error || '後端回應異常'}`;
           chatBox.appendChild(errDiv);
         }
       } catch (error) {
@@ -520,25 +401,25 @@ if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
     // ==========================================
     async function saveExperimentToDB() {
       if (!supabaseClient) {
-        alert('請先填入有效的 SUPABASE_KEY！');
+        alert('Supabase 未完成初始化！');
         return;
       }
       const tpeVal = parseFloat(document.getElementById('tpeInput')?.value || 970);
       const bAcidVal = parseFloat(document.getElementById('bAcidInput')?.value || 1235);
 
       const { data, error } = await supabaseClient
-  .from('experiment_logs')
-  .insert([
-    { 
-      experiment_name: `TPE-4OH #${Date.now().toString().slice(-4)}`, 
-      tpe_br: tpeVal, 
-      b_acid: bAcidVal, 
-      yield_percent: 85.0,
-      purification_note: '完整當量投料測試',
-      user_prompt: lastUserPrompt || '無提問',       // 👈 存入你問的話
-      ai_response: lastAiResponse || '無 AI 回覆'    // 👈 存入 AI 的回答
-    }
-  ]);
+        .from('experiment_logs')
+        .insert([
+          { 
+            experiment_name: `TPE-4OH #${Date.now().toString().slice(-4)}`, 
+            tpe_br: tpeVal, 
+            b_acid: bAcidVal, 
+            yield_percent: 85.0,
+            purification_note: '完整當量投料測試',
+            user_prompt: lastUserPrompt || '無提問',
+            ai_response: lastAiResponse || '無 AI 回覆'
+          }
+        ]);
 
       if (error) {
         alert('寫入失敗：' + error.message);
@@ -549,7 +430,7 @@ if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
 
     // 頁面載入初始化
     window.onload = function() {
-      initChart(); // 僅初始化空圖表
+      initChart();
       const userInput = document.getElementById('userAiInput');
       if (userInput) {
         userInput.addEventListener('keypress', function (e) {
