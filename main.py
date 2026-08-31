@@ -92,7 +92,7 @@ async def ai_consult(data: ConsultRequest):
         f"【使用者提問】\n{data.prompt}"
     )
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key.strip()}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={api_key.strip()}"
 
     payload = {
         "systemInstruction": {
