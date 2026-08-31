@@ -1,14 +1,15 @@
 import os
 import joblib
-import numpy as np
-from fastapi import FastAPI
+import pandas as pd
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from google import genai
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
+from google import genai
 
 app = FastAPI()
 
-# 1. 開放 CORS 跨域請求（避免前端 GitHub Pages 被擋）
+# 1. 允許 cross-origin 存取
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -17,12 +18,57 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 2. 補上根目錄 GET 測試（這樣點進網址就會顯示正常）
+# 2. 載入 ML 模型 (.pkl)
+MODEL_PATH = "suzuki_model.pkl"
+model = None
+if os.path.exists(MODEL_PATH):
+    try:
+        model = joblib.load(MODEL_PATH)
+        print("✅ suzuki_model.pkl 成功載入！")
+    except Exception as e:
+        print(f"⚠️ 載入 suzuki_model.pkl 失敗: {e}")
+
+# 3. 初始化 Gemini API Client
+# 請確保 Render 後端的 Environment Variables 有設定 GEMINI_API_KEY
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+gemini_client = None
+if GEMINI_API_KEY:
+    gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+
+
+# 4. 首頁路由：直接回傳 index.html 網頁畫面
 @app.get("/")
 def read_root():
-    return {"status": "online", "message": "Suzuki Backend API is running!"}
+    if os.path.exists("index.html"):
+        return FileResponse("index.html")
+    return {"status": "error", "message": "index.html 不存在於根目錄"}
 
-# 3. AI 諮詢 API 路由
+
+# 5. ML 產率預測接口
+class PredictRequest(BaseModel):
+    tpe_br: float
+    b_acid: float
+
+@app.post("/predict")
+def predict_yield(data: PredictRequest):
+    if model is None:
+        # 若模型載入失敗則回傳預設參考值
+        return {"predicted_yield": 85.0, "status": "fallback"}
+    
+    try:
+        # 建立特徵 DataFrame (欄位名稱請依據訓練時的名稱調整)
+        input_data = pd.DataFrame([{
+            "tpe_br": data.tpe_br,
+            "b_acid": data.b_acid
+        }])
+        prediction = model.predict(input_data)[0]
+        return {"predicted_yield": float(prediction), "status": "success"}
+    except Exception as e:
+        print(f"預測出錯: {e}")
+        return {"predicted_yield": 85.0, "status": "error", "detail": str(e)}
+
+
+# 6. AI 智慧診斷諮詢接口
 class ConsultRequest(BaseModel):
     prompt: str
     tpe_br: float
@@ -30,100 +76,30 @@ class ConsultRequest(BaseModel):
 
 @app.post("/ai-consult")
 def ai_consult(data: ConsultRequest):
-    # 這邊放你的 Gemini 呼叫邏輯
-    return {"reply": f"收到問題：{data.prompt}，目前投料為 TPE-Br: {data.tpe_br}mg"}
-
-# 4. ML 產率預測 API 路由
-class PredictRequest(BaseModel):
-    tpe_br: float
-    b_acid: float
-
-@app.post("/predict")
-def predict_yield(data: PredictRequest):
-    # 這邊放你的 .pkl 模型載入與 predict 邏輯
-    return {"predicted_yield": 85.0}
-
-# 🔑 請在這裡貼上你的 Gemini API Key
-GEMINI_API_KEY = os.getenv(
-    "GEMINI_API_KEY", "AQ.Ab8RN6JkwCl3P_uZ6nCr_JaJ0G0zkhHCmvzS8H1owIS9GyoaOg"
-)
-
-# 初始化 Gemini Client
-client = genai.Client(api_key=GEMINI_API_KEY)
-
-# 🤖 載入機器學習模型 (請確保 suzuki_model.pkl 在同一個資料夾)
-try:
-    ml_model = joblib.load("suzuki_model.pkl")
-    print("✅ ML 模型成功載入！")
-except Exception as e:
-    ml_model = None
-    print(
-        f"⚠️ ML 模型載入失敗：{e}（請確認 suzuki_model.pkl 是否存放在同一資料夾）"
+    if not gemini_client:
+        raise HTTPException(
+            status_code=500, 
+            detail="後端未設定 GEMINI_API_KEY 環境變數"
+        )
+    
+    system_instruction = (
+        "你是一位 Suzuki 偶聯反應與 2D MIM 拓樸聚合專家。"
+        "請針對使用者的提問以及目前的投料參數（TPE-Br 核心、4-羥基苯硼酸）給出專業、簡明且精準的實驗建議。"
     )
-
-
-# --- 1. 原本的 Gemini AI 顧問部分 ---
-class ReactionData(BaseModel):
-    tpe_br_mg: float = 0
-    b_acid_mg: float = 0
-    pd_mg: float = 0
-    ligand_mg: float = 0
-    user_question: str = ""
-
-
-@app.post("/api/ai-consult")
-async def ai_consult(data: ReactionData):
-    prompt = f"""
-你是一位精通 Suzuki 偶聯反應、TPE 材料合成與 NMR 定量分析的專業化學 AI 顧問。
-使用者正在進行 TPE-Br 與 4-羥基苯硼酸 (4-HBPA) 的 Suzuki 偶聯反應。
-
-當前實驗投料數據：
-- TPE-Br: {data.tpe_br_mg} mg
-- 4-羥基苯硼酸: {data.b_acid_mg} mg
-- 鈀催化劑 Pd(OAc)2: {data.pd_mg} mg
-- SPhos 配體: {data.ligand_mg} mg
-
-使用者提出的問題/討論：
-『{data.user_question}』
-
-請根據上述投料當量、化學機制與 NMR 相關知識，給出專業、簡潔且具體的分析與建議。
-【重要格式要求】：
-1. 請用繁體中文回答。
-2. 化學式請直接寫成純文字格式（例如直接寫 K2CO3、Pd(OAc)2、TPE-4OH），**千萬不要使用 LaTeX 語法（例如不要用 $...$ 或 \\text{{...}}）**，以利網頁直接閱讀。
-"""
+    
+    user_context = (
+        f"【目前實驗投料參數】\n"
+        f"- TPE-Br: {data.tpe_br} mg\n"
+        f"- 4-羥基苯硼酸: {data.b_acid} mg\n\n"
+        f"【使用者提問】\n{data.prompt}"
+    )
 
     try:
-        response = client.models.generate_content(
+        response = gemini_client.models.generate_content(
             model="gemini-2.5-flash",
-            contents=prompt,
+            contents=user_context,
+            config={"system_instruction": system_instruction}
         )
-        ai_reply = "🤖 Gemini 專家分析：\n" + response.text
+        return {"reply": response.text}
     except Exception as e:
-        ai_reply = f"🤖 Gemini API 連線失敗：\n請檢查 main.py 中的 API Key 是否正確設定。\n錯誤訊息：{str(e)}"
-
-    return {"status": "success", "reply": ai_reply}
-
-
-# --- 2. 新增的 ML 機器學習預測 API 部分 ---
-class MLPredictRequest(BaseModel):
-    tpe_br_mg: float
-    b_acid_mg: float
-    pd_mg: float
-    ligand_mg: float
-
-
-@app.post("/predict")
-def predict_yield(data: MLPredictRequest):
-    if ml_model is None:
-        return {"status": "error", "message": "ML 模型尚未載入！"}
-
-    # 將前端送來的 4 個投料數據整理成模型要求的格式
-    # 附註：請確保特徵順序與你在 Colab 訓練時放入的 X 順序完全一致
-    input_features = np.array(
-        [[data.tpe_br_mg, data.b_acid_mg, data.pd_mg, data.ligand_mg]]
-    )
-
-    # 呼叫模型進行預測
-    prediction = ml_model.predict(input_features)[0]
-
-    return {"status": "success", "predicted_yield": round(float(prediction), 2)}
+        raise HTTPException(status_code=500, detail=f"Gemini API 呼叫失敗: {str(e)}")
