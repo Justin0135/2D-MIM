@@ -351,48 +351,88 @@ function updateNMRSpectrum(yieldVal) {
         window.nmrChart.update();
     }
 }
-      // 🤖 向 Render 後端 ML 模型預測產率 API
-      try {
+      // 1. 宣告後端 API 基礎路徑 (適用於 Render 部署)
+const BACKEND_URL = window.location.origin;
+
+// 2. 主分析函式：前面務必加上 async，才可以搭配 await 呼叫 API
+async function calculateMetrics(isClick = false) {
+    if (!isClick) return;
+
+    // 讀取輸入欄位數據
+    const tpe = parseFloat(document.getElementById('tpeInput')?.value || 970);
+    const bAcid = parseFloat(document.getElementById('bAcidInput')?.value || 1235);
+    const k2co3 = parseFloat(document.getElementById('k2co3Input')?.value || 875);
+
+    // 計算當量
+    const tpeMmol = tpe / 970.0;
+    const bAcidEq = ((bAcid / 137.9) / (tpeMmol * 4)).toFixed(2);
+    const k2co3Eq = ((k2co3 / 138.2) / tpeMmol).toFixed(2);
+
+    // 💡 向 Render 後端 ML 模型請求預測產率 (加上 async / await)
+    let predYield = "85.0";
+    try {
         const response = await fetch(`${BACKEND_URL}/predict`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tpe_br: tpe, b_acid: bAcid })
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tpe_br: tpe, b_acid: bAcid })
         });
+
         if (response.ok) {
-          const resData = await response.json();
-          const predYield = resData.predicted_yield ? resData.predicted_yield.toFixed(1) : "85.0";
-          document.getElementById('predictedYieldMetric').innerHTML = `<span class="text-emerald-400">${predYield}%</span>`;
+            const resData = await response.json();
+            predYield = resData.predicted_yield ? resData.predicted_yield.toFixed(1) : "85.0";
+            
+            const yieldElem = document.getElementById('predictedYieldMetric');
+            if (yieldElem) {
+                yieldElem.innerHTML = `<span class="text-emerald-400">${predYield}%</span>`;
+            }
         } else {
-          document.getElementById('predictedYieldMetric').innerHTML = '<span class="text-emerald-400">85.0%</span>';
+            const yieldElem = document.getElementById('predictedYieldMetric');
+            if (yieldElem) yieldElem.innerHTML = '<span class="text-emerald-400">85.0%</span>';
         }
-      } catch (err) {
+    } catch (err) {
         console.warn("後端預測連線超時，使用預設值:", err);
-        document.getElementById('predictedYieldMetric').innerHTML = '<span class="text-emerald-400">85.0%</span>';
-      }
+        const yieldElem = document.getElementById('predictedYieldMetric');
+        if (yieldElem) yieldElem.innerHTML = '<span class="text-emerald-400">85.0%</span>';
+    }
 
-      const list = document.getElementById('diagnosticList');
-      list.innerHTML = `
-        <li class="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-300">
-          💡 <strong>K₂CO₃ 當量</strong>：符合標準 (約 ${k2co3Eq} eq)。
-        </li>
-        <li class="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-300">
-          💡 <strong>硼酸當量</strong>：充裕 (約 ${bAcidEq} eq，滿足四重偶聯安全閥值)。
-        </li>
-      `;
+    // 更新現場診斷文字清單
+    const list = document.getElementById('diagnosticList');
+    if (list) {
+        list.innerHTML = `
+            <li class="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-300">
+                💡 <strong>K₂CO₃ 當量</strong>：符合標準（約 ${k2co3Eq} eq）。
+            </li>
+            <li class="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-300">
+                💡 <strong>硼酸當量</strong>：充裕（約 ${bAcidEq} eq），滿足四重偶聯安全閾值。
+            </li>
+        `;
+    }
 
-      if (chartInstance) {
+    // 繪製與更新 1H-NMR 圖表 (Chart.js)
+    if (typeof chartInstance !== 'undefined' && chartInstance) {
         const newData = Array(100).fill(0);
-        newData[34] = 85;  // δ 6.62 產物芳香環峰
-        newData[39] = 100; // δ 6.08 內標 Ar-H 峰
-        newData[62] = 40;  // δ 3.76 內標 OCH3 峰
+        const yieldFactor = parseFloat(predYield) / 100;
+
+        newData[34] = 85 * yieldFactor; // δ 6.62 產物芳香環峰 (隨產率連動)
+        newData[39] = 100;             // δ 6.08 內標 Ar-H 峰
+        newData[62] = 40;              // δ 3.76 內標 OCH3 峰
+
         chartInstance.data.datasets[0].data = newData;
         chartInstance.update();
-      }
-
-      document.getElementById('chartStatus').innerText = "已生成";
-      document.getElementById('chartStatus').className = "text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-mono";
-      document.getElementById('spectrumDetails').classList.remove('hidden');
     }
+
+    // 更新圖表標籤狀態為「已生成」
+    const chartStatus = document.getElementById('chartStatus');
+    if (chartStatus) {
+        chartStatus.innerText = "已生成";
+        chartStatus.className = "text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-mono";
+    }
+
+    const spectrumDetails = document.getElementById('spectrumDetails');
+    if (spectrumDetails) {
+        spectrumDetails.classList.remove('hidden');
+    }
+}
 
     // ==========================================
     // 2. 獨立 AI 對話發送函數 (對接 Render 後端)
