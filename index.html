@@ -204,7 +204,6 @@
     // ==========================================
     // 1. 全域網址與 Supabase 設定
     // ==========================================
-    // 🚀 核心修改：後端網址指向你部署在 Render 上的 API
     const BACKEND_URL = "https://suzuki-backend-9j1w.onrender.com";
 
     const SUPABASE_URL = 'https://zuodhjfmryryasujwhhb.supabase.co';
@@ -262,248 +261,130 @@
         .trim();
     }
 
-    // 按下「執行分析與生成光譜」
-async function calculateMetrics(isClick = false) {
-    if (!isClick) return;
+    // ==========================================
+    // 2. 主分析與動態計算 qNMR 光譜函式
+    // ==========================================
+    async function calculateMetrics(isClick = false) {
+        if (!isClick) return;
 
-    // 1. 讀取輸入欄位數據 (含預設備用值)
-    const tpe = parseFloat(document.getElementById('tpeInput')?.value || 970);
-    const bAcid = parseFloat(document.getElementById('bAcidInput')?.value || 1235);
-    const pd = parseFloat(document.getElementById('pdInput')?.value || 4.4);
-    const sphos = parseFloat(document.getElementById('sphosInput')?.value || 15.6);
-    const k2co3 = parseFloat(document.getElementById('k2co3Input')?.value || 875);
-    const isIS = parseFloat(document.getElementById('isInput')?.value || 84);
+        // 1. 完整讀取面板上所有的投料參數與重量 (mg, mL, °C)
+        const tpe = parseFloat(document.getElementById('tpeInput')?.value || 970);
+        const bAcid = parseFloat(document.getElementById('bAcidInput')?.value || 1235);
+        const pd = parseFloat(document.getElementById('pdInput')?.value || 4.4);
+        const sphos = parseFloat(document.getElementById('sphosInput')?.value || 15.6);
+        const k2co3 = parseFloat(document.getElementById('k2co3Input')?.value || 875);
+        const tbab = parseFloat(document.getElementById('tbabInput')?.value || 250);
+        const isIS = parseFloat(document.getElementById('isInput')?.value || 84); // 內標
+        const vol = parseFloat(document.getElementById('volInput')?.value || 18.3);
+        const temp = parseFloat(document.getElementById('tempInput')?.value || 81);
 
-    // 2. 莫耳數與當量計算
-    const tpeMmol = tpe / 970.0;
-    const bAcidMmol = bAcid / 137.91;
-    const isMmol = isIS / 168.19;
-    const pdMmol = pd / 224.51;
-    const sphosMmol = sphos / 410.53;
+        // 2. 化學莫耳數與當量計算
+        const tpeMmol = tpe / 970.0;
+        const bAcidMmol = bAcid / 137.91;
+        const isMmol = isIS / 168.19;
+        const pdMmol = pd / 224.51;
+        const sphosMmol = sphos / 410.53;
 
-    const bAcidEq = (bAcidMmol / (tpeMmol * 4)).toFixed(2);
-    const k2co3Eq = ((k2co3 / 138.21) / tpeMmol).toFixed(2);
+        const bAcidEq = (bAcidMmol / (tpeMmol * 4)).toFixed(2);
+        const k2co3Eq = ((k2co3 / 138.21) / tpeMmol).toFixed(2);
 
-    // 3. 計算 鈀黑風險 (L/Pd 配體莫耳比)
-    const lToPdRatio = pdMmol > 0 ? (sphosMmol / pdMmol) : 0;
-    let riskHtml = '';
-    if (lToPdRatio >= 1.8) {
-        riskHtml = '<span class="text-emerald-400">10</span> (安全)';
-    } else if (lToPdRatio >= 1.2) {
-        riskHtml = '<span class="text-amber-400">50</span> (中度)';
-    } else {
-        riskHtml = '<span class="text-red-400">85</span> (高風險)';
-    }
-
-    // 🎯 關鍵修復：直接寫入你 HTML 上的 id="riskMetric" 與 id="eqMetric"
-    const riskElem = document.getElementById('riskMetric');
-    if (riskElem) riskElem.innerHTML = riskHtml;
-
-    const eqElem = document.getElementById('eqMetric');
-    if (eqElem) eqElem.innerHTML = `<span class="text-emerald-400">${bAcidEq}</span> eq`;
-
-    // 4. 呼叫後端 ML 預測產率 API
-    let predYield = 85.0;
-    try {
-        const response = await fetch(`${BACKEND_URL}/predict`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tpe_br: tpe, b_acid: bAcid })
-        });
-
-        if (response.ok) {
-            const resData = await response.json();
-            predYield = resData.predicted_yield ? parseFloat(resData.predicted_yield) : 85.0;
-        }
-    } catch (err) {
-        console.warn("後端預測連線超時，使用預設值:", err);
-    }
-
-    // 更新 ML 預測產率卡片
-    const yieldElem = document.getElementById('predictedYieldMetric') || document.getElementById('yieldMetric');
-    if (yieldElem) yieldElem.innerHTML = `<span class="text-emerald-400">${predYield.toFixed(1)}%</span>`;
-
-    // 5. 更新現場診斷文字
-    const list = document.getElementById('diagnosticList');
-    if (list) {
-        list.innerHTML = `
-            <li class="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-300">
-                💡 <strong>K₂CO₃ 當量</strong>：符合標準（約 ${k2co3Eq} eq）。
-            </li>
-            <li class="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-300">
-                💡 <strong>硼酸當量</strong>：充裕（約 ${bAcidEq} eq），滿足四重偶聯安全閾值。
-            </li>
-        `;
-    }
-
-    // 6. 動態繪製 1H-NMR 光譜圖表
-    if (typeof chartInstance !== 'undefined' && chartInstance) {
-        const productMmol = tpeMmol * (predYield / 100.0);
-        const isArHBaseHeight = 100;
-        const productPeakHeight = isMmol > 0 ? (productMmol * 8) / (isMmol * 3) * isArHBaseHeight : 85;
-        const isOCH3Height = isArHBaseHeight * 3.0;
-
-        const newData = Array(100).fill(0);
-        newData[34] = Math.min(productPeakHeight, 150); // δ 6.62 產物峰
-        newData[39] = isArHBaseHeight;                 // δ 6.08 內標 Ar-H 峰
-        newData[62] = Math.min(isOCH3Height, 180);      // δ 3.76 內標 OCH3 峰
-
-        chartInstance.data.datasets[0].data = newData;
-        chartInstance.update();
-    }
-
-    // 7. 更新光譜圖表狀態標籤
-    const chartStatus = document.getElementById('chartStatus');
-    if (chartStatus) {
-        chartStatus.innerText = "已生成";
-        chartStatus.className = "text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-mono";
-    }
-
-    const spectrumDetails = document.getElementById('spectrumDetails');
-    if (spectrumDetails) {
-        spectrumDetails.classList.remove('hidden');
-    }
-}
-
-    // 更新 ML 產率顯示
-    const yieldElem = document.getElementById('predictedYieldMetric') || document.getElementById('yieldMetric');
-    if (yieldElem) yieldElem.innerHTML = `<span class="text-emerald-400">${predYield.toFixed(1)}%</span>`;
-
-    // 5. 動態生成 1H-NMR 光譜數據 (依據 mg 秤重與莫耳比例)
-    if (typeof chartInstance !== 'undefined' && chartInstance) {
-        const productMmol = tpeMmol * (predYield / 100.0); // 實際生成產物莫耳數
-
-        // 基準：將內標 Ar-H 峰 (3H) 高度設為 100
-        const isArHBaseHeight = 100;
-        
-        // 根據莫耳數與質子數計算產物與內標 OCH3 的相對峰高
-        // 產物芳香環峰 (8H) 相對高度
-        const productPeakHeight = isMmol > 0 
-            ? (productMmol * 8) / (isMmol * 3) * isArHBaseHeight 
-            : 85;
-
-        // 內標 -OCH3 峰 (9H) 相對高度 (相對於 3H 芳香峰應為 3 倍)
-        const isOCH3Height = isArHBaseHeight * 3.0;
-
-        // 生成圖表 X/Y 數據 (陣列大小為 100，模擬 0 ~ 10 ppm)
-        const newData = Array(100).fill(0);
-
-        // 寫入對應化學位移 (Chemical Shift δ) 的峰高
-        newData[34] = Math.min(productPeakHeight, 150); // δ 6.62 產物芳香環特徵峰 (依據 TPE 投料與產率)
-        newData[39] = isArHBaseHeight;                 // δ 6.08 內標物 Ar-H 峰
-        newData[62] = Math.min(isOCH3Height, 180);      // δ 3.76 內標物 -OCH3 峰
-
-        chartInstance.data.datasets[0].data = newData;
-        chartInstance.update();
-    }
-
-    // 6. 更新現場診斷清單與狀態
-    const list = document.getElementById('diagnosticList');
-    if (list) {
-        list.innerHTML = `
-            <li class="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-300">
-                💡 <strong>K₂CO₃ 當量</strong>：符合標準（約 ${k2co3Eq} eq）。
-            </li>
-            <li class="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-300">
-                💡 <strong>硼酸當量</strong>：充裕（約 ${bAcidEq} eq），滿足四重偶聯安全閾值。
-            </li>
-        `;
-    }
-
-    const chartStatus = document.getElementById('chartStatus');
-    if (chartStatus) {
-        chartStatus.innerText = "已生成";
-        chartStatus.className = "text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-mono";
-    }
-
-    const spectrumDetails = document.getElementById('spectrumDetails');
-    if (spectrumDetails) {
-        spectrumDetails.classList.remove('hidden');
-    }
-}
-    
-// 主分析函式：前面務必加上 async，才可以搭配 await 呼叫 API
-async function calculateMetrics(isClick = false) {
-    if (!isClick) return;
-
-    // 讀取輸入欄位數據
-    const tpe = parseFloat(document.getElementById('tpeInput')?.value || 970);
-    const bAcid = parseFloat(document.getElementById('bAcidInput')?.value || 1235);
-    const k2co3 = parseFloat(document.getElementById('k2co3Input')?.value || 875);
-
-    // 計算當量
-    const tpeMmol = tpe / 970.0;
-    const bAcidEq = ((bAcid / 137.9) / (tpeMmol * 4)).toFixed(2);
-    const k2co3Eq = ((k2co3 / 138.2) / tpeMmol).toFixed(2);
-
-    // 💡 向 Render 後端 ML 模型請求預測產率 (加上 async / await)
-    let predYield = "85.0";
-    try {
-        const response = await fetch(`${BACKEND_URL}/predict`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tpe_br: tpe, b_acid: bAcid })
-        });
-
-        if (response.ok) {
-            const resData = await response.json();
-            predYield = resData.predicted_yield ? resData.predicted_yield.toFixed(1) : "85.0";
-            
-            const yieldElem = document.getElementById('predictedYieldMetric');
-            if (yieldElem) {
-                yieldElem.innerHTML = `<span class="text-emerald-400">${predYield}%</span>`;
-            }
+        // 3. 鈀黑風險評估 (SPhos / Pd 莫耳比)
+        const lToPdRatio = pdMmol > 0 ? (sphosMmol / pdMmol) : 0;
+        let riskHtml = '';
+        if (lToPdRatio >= 1.8) {
+            riskHtml = '<span class="text-emerald-400">10</span> (安全)';
+        } else if (lToPdRatio >= 1.2) {
+            riskHtml = '<span class="text-amber-400">50</span> (中度)';
         } else {
-            const yieldElem = document.getElementById('predictedYieldMetric');
-            if (yieldElem) yieldElem.innerHTML = '<span class="text-emerald-400">85.0%</span>';
+            riskHtml = '<span class="text-red-400">85</span> (高風險)';
         }
-    } catch (err) {
-        console.warn("後端預測連線超時，使用預設值:", err);
-        const yieldElem = document.getElementById('predictedYieldMetric');
-        if (yieldElem) yieldElem.innerHTML = '<span class="text-emerald-400">85.0%</span>';
+
+        // 寫入鈀黑風險與硼酸當量卡片
+        const riskElem = document.getElementById('riskMetric');
+        if (riskElem) riskElem.innerHTML = riskHtml;
+
+        const eqElem = document.getElementById('eqMetric');
+        if (eqElem) eqElem.innerHTML = `<span class="text-emerald-400">${bAcidEq}</span> eq`;
+
+        // 4. 呼叫後端 ML 預測產率 API (傳送完整參數)
+        let predYield = 85.0;
+        try {
+            const response = await fetch(`${BACKEND_URL}/predict`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    tpe_br: tpe, 
+                    b_acid: bAcid,
+                    pd_oac2: pd,
+                    sphos: sphos,
+                    k2co3: k2co3,
+                    tbab: tbab,
+                    temp: temp,
+                    volume: vol
+                })
+            });
+
+            if (response.ok) {
+                const resData = await response.json();
+                predYield = resData.predicted_yield ? parseFloat(resData.predicted_yield) : 85.0;
+            }
+        } catch (err) {
+            console.warn("後端預測連線超時，使用預設值:", err);
+        }
+
+        // 更新 ML 預測產率顯示
+        const yieldElem = document.getElementById('predictedYieldMetric') || document.getElementById('yieldMetric');
+        if (yieldElem) yieldElem.innerHTML = `<span class="text-emerald-400">${predYield.toFixed(1)}%</span>`;
+
+        // 5. 動態生成 1H-NMR 光譜數據 (依據真實 mg 秤重與莫耳比例換算峰高)
+        if (typeof chartInstance !== 'undefined' && chartInstance) {
+            const productMmol = tpeMmol * (predYield / 100.0);
+            const isArHBaseHeight = 100;
+            
+            // 依據內標與產物的莫耳數及質子數計算相對峰高
+            const productPeakHeight = isMmol > 0 
+                ? (productMmol * 8) / (isMmol * 3) * isArHBaseHeight 
+                : 85;
+
+            const isOCH3Height = isArHBaseHeight * 3.0;
+
+            const newData = Array(100).fill(0);
+            newData[34] = Math.min(productPeakHeight, 150); // δ 6.62 產物芳香環峰
+            newData[39] = isArHBaseHeight;                 // δ 6.08 內標 Ar-H 峰
+            newData[62] = Math.min(isOCH3Height, 180);      // δ 3.76 內標 OCH3 峰
+
+            chartInstance.data.datasets[0].data = newData;
+            chartInstance.update();
+        }
+
+        // 6. 更新現場診斷清單
+        const list = document.getElementById('diagnosticList');
+        if (list) {
+            list.innerHTML = `
+                <li class="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-300">
+                    💡 <strong>K₂CO₃ 當量</strong>：符合標準（約 ${k2co3Eq} eq）。
+                </li>
+                <li class="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-300">
+                    💡 <strong>硼酸當量</strong>：充裕（約 ${bAcidEq} eq），滿足四重偶聯安全閾值。
+                </li>
+            `;
+        }
+
+        // 7. 更新圖表狀態與細節標籤
+        const chartStatus = document.getElementById('chartStatus');
+        if (chartStatus) {
+            chartStatus.innerText = "已生成";
+            chartStatus.className = "text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-mono";
+        }
+
+        const spectrumDetails = document.getElementById('spectrumDetails');
+        if (spectrumDetails) {
+            spectrumDetails.classList.remove('hidden');
+        }
     }
-
-    // 更新現場診斷文字清單
-    const list = document.getElementById('diagnosticList');
-    if (list) {
-        list.innerHTML = `
-            <li class="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-300">
-                💡 <strong>K₂CO₃ 當量</strong>：符合標準（約 ${k2co3Eq} eq）。
-            </li>
-            <li class="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-300">
-                💡 <strong>硼酸當量</strong>：充裕（約 ${bAcidEq} eq），滿足四重偶聯安全閾值。
-            </li>
-        `;
-    }
-
-    // 繪製與更新 1H-NMR 圖表 (Chart.js)
-    if (typeof chartInstance !== 'undefined' && chartInstance) {
-        const newData = Array(100).fill(0);
-        const yieldFactor = parseFloat(predYield) / 100;
-
-        newData[34] = 85 * yieldFactor; // δ 6.62 產物芳香環峰 (隨產率連動)
-        newData[39] = 100;             // δ 6.08 內標 Ar-H 峰
-        newData[62] = 40;              // δ 3.76 內標 OCH3 峰
-
-        chartInstance.data.datasets[0].data = newData;
-        chartInstance.update();
-    }
-
-    // 更新圖表標籤狀態為「已生成」
-    const chartStatus = document.getElementById('chartStatus');
-    if (chartStatus) {
-        chartStatus.innerText = "已生成";
-        chartStatus.className = "text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-mono";
-    }
-
-    const spectrumDetails = document.getElementById('spectrumDetails');
-    if (spectrumDetails) {
-        spectrumDetails.classList.remove('hidden');
-    }
-}
 
     // ==========================================
-    // 2. 獨立 AI 對話發送函數 (對接 Render 後端)
+    // 3. 獨立 AI 對話發送函數 (對接 Render 後端)
     // ==========================================
     async function askCloudAI() {
       const chatBox = document.getElementById('chatBox');
@@ -532,7 +413,6 @@ async function calculateMetrics(isClick = false) {
       const tpeVal = document.getElementById('tpeInput')?.value || 970;
       const bAcidVal = document.getElementById('bAcidInput')?.value || 1235;
 
-      // 🚀 核心修改：發送請求至 Render 後端 API
       try {
         const response = await fetch(`${BACKEND_URL}/ai-consult`, {
           method: 'POST',
@@ -579,7 +459,7 @@ async function calculateMetrics(isClick = false) {
     }
 
     // ==========================================
-    // 3. 儲存實驗紀錄至 Supabase
+    // 4. 儲存實驗紀錄至 Supabase
     // ==========================================
     async function saveExperimentToDB() {
       if (!supabaseClient) {
