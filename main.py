@@ -65,7 +65,7 @@ def predict_yield(data: PredictRequest):
         return {"predicted_yield": 85.0, "status": "error", "detail": str(e)}
 
 
-# 5. AI 智慧診斷諮詢接口 (多模型自動備援修復版)
+# 5. AI 智慧診斷諮詢接口 (系統指令優化 + 多模型自動備援)
 class ConsultRequest(BaseModel):
     prompt: str
     tpe_br: float
@@ -82,9 +82,13 @@ async def ai_consult(data: ConsultRequest):
     
     clean_api_key = api_key.strip().strip('"').strip("'")
     
+    # 🎯 優化後的 System Instruction：嚴格切離 Suzuki 與 MIM 話題
     system_instruction = (
-        "你是一位 Suzuki 偶聯反應與 2D MIM 拓樸聚合專家。"
-        "請針對使用者的提問以及目前的投料參數（TPE-Br 核心、4-羥基苯硼酸）給出專業、簡明且精準的實驗建議。"
+        "你是一位有機合成與 Suzuki-Miyaura 偶聯反應專家。\n"
+        "【回答原則】\n"
+        "1. 請針對使用者的提問以及當前投料參數（如 TPE-Br 核心、4-羥基苯硼酸、催化劑、鹼、溶劑等）給出專業、簡明且精準的實驗建議與化學機制分析。\n"
+        "2. 【重要約束】當使用者討論 Suzuki 反應的參數、鹼量、催化劑或產率失敗原因時，請專注在 Suzuki 反應本身的有機合成機制（如氧化加成、轉金屬、還原消除、鹼作用機制等）。\n"
+        "3. 【嚴禁事項】除非使用者在問題中主動提及「MIM」、「拓樸」、「2D MIM」或「2D 聚合物」，否則回答中【絕對不要】提到任何 2D MIM、拓樸聚合或分子印跡等相關詞彙與概念。"
     )
     
     user_context = (
@@ -110,12 +114,12 @@ async def ai_consult(data: ConsultRequest):
         ]
     }
 
-    # 備援模型優先順序表
+    # 最新備援模型優先順序表（已移除過時的 2.5，加入 3.6）
     candidate_models = [
         "gemini-3.5-flash-lite",
         "gemini-3.5-flash",
+        "gemini-3.6-flash",
         "gemini-3.8-flash",
-        "gemini-3.6-flash"
     ]
 
     last_error_msg = ""
@@ -126,13 +130,11 @@ async def ai_consult(data: ConsultRequest):
             try:
                 response = await client.post(url, json=payload, headers=headers)
                 
-                # 請求成功，提取回應內容回傳
                 if response.status_code == 200:
                     res_data = response.json()
                     reply_text = res_data["candidates"][0]["content"]["parts"][0]["text"]
                     return {"reply": reply_text, "model_used": model_name}
                 
-                # 若回應非 200 (包含 503 忙碌, 429 限流, 404 等)，紀錄錯誤並自動進行下一個模型重試
                 last_error_msg = f"({response.status_code}): {response.text}"
                 print(f"⚠️ 模型 {model_name} 傳回 status {response.status_code}，自動切換至下一個備用模型...")
                 
@@ -140,7 +142,6 @@ async def ai_consult(data: ConsultRequest):
                 last_error_msg = str(e)
                 print(f"⚠️ 呼叫模型 {model_name} 時發生網路/連線例外: {e}")
 
-    # 若列表內所有模型皆呼叫失敗，才丟出異常
     raise HTTPException(
         status_code=503, 
         detail=f"Google AI 服務全數忙碌中或回應異常。最後錯誤細節: {last_error_msg}"
