@@ -5,7 +5,7 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from pydantic import BaseModel  # <--- 就是漏了這行！
+from pydantic import BaseModel
 
 app = FastAPI()
 
@@ -65,7 +65,7 @@ def predict_yield(data: PredictRequest):
         return {"predicted_yield": 85.0, "status": "error", "detail": str(e)}
 
 
-# 5. AI 智慧診斷諮詢接口 (使用 x-goog-api-key 驗證，解決 401 錯誤)
+# 5. AI 智慧診斷諮詢接口 (多模型自動備援修復版)
 class ConsultRequest(BaseModel):
     prompt: str
     tpe_br: float
@@ -94,8 +94,6 @@ async def ai_consult(data: ConsultRequest):
         f"【使用者提問】\n{data.prompt}"
     )
 
-    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent"
-
     headers = {
         "Content-Type": "application/json",
         "x-goog-api-key": clean_api_key
@@ -112,19 +110,38 @@ async def ai_consult(data: ConsultRequest):
         ]
     }
 
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(url, json=payload, headers=headers)
-            
-            if response.status_code != 200:
-                raise HTTPException(
-                    status_code=response.status_code, 
-                    detail=f"Gemini API 傳回錯誤 ({response.status_code}): {response.text}"
-                )
-            
-            res_data = response.json()
-            reply_text = res_data["candidates"][0]["content"]["parts"][0]["text"]
-            return {"reply": reply_text}
+    # 備援模型優先順序表
+    candidate_models = [
+        "gemini-3.5-flash-lite",
+        "gemini-3.5-flash",
+        "gemini-3.8-flash",
+        "gemini-2.5-flash"
+    ]
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"呼叫 API 過程發生例外: {str(e)}")
+    last_error_msg = ""
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        for model_name in candidate_models:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent"
+            try:
+                response = await client.post(url, json=payload, headers=headers)
+                
+                # 請求成功，提取回應內容回傳
+                if response.status_code == 200:
+                    res_data = response.json()
+                    reply_text = res_data["candidates"][0]["content"]["parts"][0]["text"]
+                    return {"reply": reply_text, "model_used": model_name}
+                
+                # 若回應非 200 (包含 503 忙碌, 429 限流, 404 等)，紀錄錯誤並自動進行下一個模型重試
+                last_error_msg = f"({response.status_code}): {response.text}"
+                print(f"⚠️ 模型 {model_name} 傳回 status {response.status_code}，自動切換至下一個備用模型...")
+                
+            except Exception as e:
+                last_error_msg = str(e)
+                print(f"⚠️ 呼叫模型 {model_name} 時發生網路/連線例外: {e}")
+
+    # 若列表內所有模型皆呼叫失敗，才丟出異常
+    raise HTTPException(
+        status_code=503, 
+        detail=f"Google AI 服務全數忙碌中或回應異常。最後錯誤細節: {last_error_msg}"
+    )
