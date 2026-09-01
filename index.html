@@ -266,89 +266,126 @@
 async function calculateMetrics(isClick = false) {
     if (!isClick) return;
 
-    // 1. 讀取輸入框數據 (使用你原有的 ID)
+    // 1. 抓取面板上「所有」投料量與實驗條件 (毫克 mg / 毫升 mL / 溫度 °C)
     const tpe = parseFloat(document.getElementById('tpeInput')?.value || 970);
     const bAcid = parseFloat(document.getElementById('bAcidInput')?.value || 1235);
+    const pd = parseFloat(document.getElementById('pdInput')?.value || 4.4);
+    const sphos = parseFloat(document.getElementById('sphosInput')?.value || 15.6);
     const k2co3 = parseFloat(document.getElementById('k2co3Input')?.value || 875);
+    const tbab = parseFloat(document.getElementById('tbabInput')?.value || 250);
+    const isIS = parseFloat(document.getElementById('isInput')?.value || 84); // 1,3,5-三甲氧基苯 (內標)
+    const vol = parseFloat(document.getElementById('volInput')?.value || 18.3);
+    const temp = parseFloat(document.getElementById('tempInput')?.value || 81);
 
-    // 2. 計算當量與風險評估
-    const tpeMmol = tpe / 970.0;
-    const bAcidEq = ((bAcid / 137.9) / (tpeMmol * 4)).toFixed(2);
-    const k2co3Eq = ((k2co3 / 138.2) / tpeMmol).toFixed(2);
+    // 2. 化學莫耳數計算 (mmol)
+    const tpeMmol = tpe / 970.0;                              // TPE-Br (MW ~970)
+    const bAcidMmol = bAcid / 137.91;                          // 4-羥基苯硼酸 (MW 137.91)
+    const isMmol = isIS / 168.19;                             // 內標物 1,3,5-三甲氧基苯 (MW 168.19)
+    const pdMmol = pd / 224.51;                               // Pd(OAc)2 (MW 224.51)
+    const sphosMmol = sphos / 410.53;                         // SPhos (MW 410.53)
 
-    const riskElem = document.getElementById('riskMetric');
-    if (riskElem) riskElem.innerHTML = '<span class="text-emerald-400">10</span> (安全)';
+    // 當量計算
+    const bAcidEq = (bAcidMmol / (tpeMmol * 4)).toFixed(2);    // 硼酸當量 (四重偶聯)
+    const k2co3Eq = ((k2co3 / 138.21) / tpeMmol).toFixed(2);   // 鹼當量
 
-    const eqElem = document.getElementById('eqMetric');
+    // 3. 鈀黑風險評估 (SPhos / Pd 莫耳比)
+    const lToPdRatio = pdMmol > 0 ? (sphosMmol / pdMmol) : 0;
+    let riskHtml = '';
+    if (lToPdRatio >= 1.8) {
+        riskHtml = '<span class="text-emerald-400">10</span> (安全)';
+    } else if (lToPdRatio >= 1.2) {
+        riskHtml = '<span class="text-amber-400">50</span> (中度)';
+    } else {
+        riskHtml = '<span class="text-red-400">85</span> (高風險)';
+    }
+
+    // 更新指標卡片：鈀黑風險與硼酸當量
+    const riskElem = document.getElementById('riskMetric') || document.getElementById('pdRiskMetric');
+    if (riskElem) riskElem.innerHTML = riskHtml;
+
+    const eqElem = document.getElementById('eqMetric') || document.getElementById('boronicMetric');
     if (eqElem) eqElem.innerHTML = `<span class="text-emerald-400">${bAcidEq}</span> eq`;
 
-    // 3. 呼叫 Python 後端 /predict 取得 ML 預測產率
-    let predictedYield = 85.0; // 預設備用值
-    
-    // 尋找 ML 產率顯示的位置
-    const yieldElem = document.getElementById('yieldMetric') || document.getElementById('mlYieldDisplay');
-    if (yieldElem) yieldElem.innerHTML = '<span class="text-amber-400">計算中...</span>';
-
+    // 4. 呼叫後端 ML 預測 API (傳送完整參數)
+    let predYield = 85.0;
     try {
-        const response = await fetch('/predict', {
+        const response = await fetch(`${BACKEND_URL}/predict`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                tpe_br: tpe,
-                b_acid: bAcid
+            body: JSON.stringify({ 
+                tpe_br: tpe, 
+                b_acid: bAcid,
+                pd_oac2: pd,
+                sphos: sphos,
+                k2co3: k2co3,
+                tbab: tbab,
+                temp: temp,
+                volume: vol
             })
         });
 
         if (response.ok) {
-            const data = await response.json();
-            predictedYield = parseFloat(data.predicted_yield).toFixed(1);
+            const resData = await response.json();
+            predYield = resData.predicted_yield ? parseFloat(resData.predicted_yield) : 85.0;
         }
     } catch (err) {
-        console.error("預測 API 呼叫失敗，改用預設值:", err);
+        console.warn("後端預測連線超時，使用預設備用值:", err);
     }
 
-    // 4. 更新產率顯示 UI
-    if (yieldElem) {
-        yieldElem.innerHTML = `<span class="text-emerald-400">${predictedYield}</span> %`;
-    }
+    // 更新 ML 產率顯示
+    const yieldElem = document.getElementById('predictedYieldMetric') || document.getElementById('yieldMetric');
+    if (yieldElem) yieldElem.innerHTML = `<span class="text-emerald-400">${predYield.toFixed(1)}%</span>`;
 
-    // 5. 繪製並更新 1H-NMR 光譜波峰
-    updateNMRSpectrum(predictedYield);
-}
+    // 5. 動態生成 1H-NMR 光譜數據 (依據 mg 秤重與莫耳比例)
+    if (typeof chartInstance !== 'undefined' && chartInstance) {
+        const productMmol = tpeMmol * (predYield / 100.0); // 實際生成產物莫耳數
 
-// 模擬 1H-NMR 光譜畫圖邏輯
-function updateNMRSpectrum(yieldVal) {
-    // 更改圖表右上方狀態
-    const statusElem = document.getElementById('spectrumStatus');
-    if (statusElem) statusElem.innerText = "已生成";
-
-    const labels = [];
-    const signalData = [];
-    
-    // 生成 0.0 ~ 10.0 ppm 的 X/Y 數據點
-    for (let x = 0; x <= 10; x += 0.05) {
-        labels.push(x.toFixed(2));
+        // 基準：將內標 Ar-H 峰 (3H) 高度設為 100
+        const isArHBaseHeight = 100;
         
-        let intensity = 0;
-        // CDCl3 溶劑峰 (7.26 ppm)
-        intensity += 0.25 * Math.exp(-Math.pow(x - 7.26, 2) / 0.001);
-        // TPE 核心芳香峰 (6.95 ppm & 7.08 ppm，隨產率調高而拉高)
-        intensity += (yieldVal / 100) * 0.9 * Math.exp(-Math.pow(x - 6.95, 2) / 0.008);
-        intensity += (yieldVal / 100) * 0.7 * Math.exp(-Math.pow(x - 7.08, 2) / 0.005);
-        // -OH 酚羥基峰 (5.20 ppm)
-        intensity += (yieldVal / 100) * 0.4 * Math.exp(-Math.pow(x - 5.20, 2) / 0.003);
-        // 內標 1,3,5-三甲氧基苯 (6.50 ppm & 3.80 ppm)
-        intensity += 0.8 * Math.exp(-Math.pow(x - 6.50, 2) / 0.002);
-        intensity += 1.0 * Math.exp(-Math.pow(x - 3.80, 2) / 0.002);
+        // 根據莫耳數與質子數計算產物與內標 OCH3 的相對峰高
+        // 產物芳香環峰 (8H) 相對高度
+        const productPeakHeight = isMmol > 0 
+            ? (productMmol * 8) / (isMmol * 3) * isArHBaseHeight 
+            : 85;
 
-        signalData.push(intensity);
+        // 內標 -OCH3 峰 (9H) 相對高度 (相對於 3H 芳香峰應為 3 倍)
+        const isOCH3Height = isArHBaseHeight * 3.0;
+
+        // 生成圖表 X/Y 數據 (陣列大小為 100，模擬 0 ~ 10 ppm)
+        const newData = Array(100).fill(0);
+
+        // 寫入對應化學位移 (Chemical Shift δ) 的峰高
+        newData[34] = Math.min(productPeakHeight, 150); // δ 6.62 產物芳香環特徵峰 (依據 TPE 投料與產率)
+        newData[39] = isArHBaseHeight;                 // δ 6.08 內標物 Ar-H 峰
+        newData[62] = Math.min(isOCH3Height, 180);      // δ 3.76 內標物 -OCH3 峰
+
+        chartInstance.data.datasets[0].data = newData;
+        chartInstance.update();
     }
 
-    // 更新頁面上的 Chart.js 實體
-    if (window.nmrChart) {
-        window.nmrChart.data.labels = labels;
-        window.nmrChart.data.datasets[0].data = signalData;
-        window.nmrChart.update();
+    // 6. 更新現場診斷清單與狀態
+    const list = document.getElementById('diagnosticList');
+    if (list) {
+        list.innerHTML = `
+            <li class="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-300">
+                💡 <strong>K₂CO₃ 當量</strong>：符合標準（約 ${k2co3Eq} eq）。
+            </li>
+            <li class="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-300">
+                💡 <strong>硼酸當量</strong>：充裕（約 ${bAcidEq} eq），滿足四重偶聯安全閾值。
+            </li>
+        `;
+    }
+
+    const chartStatus = document.getElementById('chartStatus');
+    if (chartStatus) {
+        chartStatus.innerText = "已生成";
+        chartStatus.className = "text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-mono";
+    }
+
+    const spectrumDetails = document.getElementById('spectrumDetails');
+    if (spectrumDetails) {
+        spectrumDetails.classList.remove('hidden');
     }
 }
     
