@@ -65,7 +65,7 @@ def predict_yield(data: PredictRequest):
         return {"predicted_yield": 85.0, "status": "error", "detail": str(e)}
 
 
-# 5. AI 智慧診斷諮詢接口 (系統指令優化 + 多模型自動備援)
+# 5. AI 智慧診斷諮詢接口 (嵌入文獻基準數據 + 多模型自動備援)
 class ConsultRequest(BaseModel):
     prompt: str
     tpe_br: float
@@ -82,18 +82,27 @@ async def ai_consult(data: ConsultRequest):
     
     clean_api_key = api_key.strip().strip('"').strip("'")
     
-    # 🎯 優化後的 System Instruction：嚴格切離 Suzuki 與 MIM 話題
+    # 🎯 融入文獻基準數據的 System Instruction
     system_instruction = (
-        "你是一位有機合成與 Suzuki-Miyaura 偶聯反應專家。\n"
+        "你是一位有機合成與 Suzuki-Miyaura 偶聯反應專家。\n\n"
+        "【文獻標準實驗基準 (Standard Protocol)】\n"
+        "反應容器：20 mL Scintillation vial\n"
+        "1. TPE-Br (1,1,2,2-tetrakis-(4-bromophenyl)ethylene): 960 mg (1.48 mmol, 1.00 equiv)\n"
+        "2. 4-羥基苯硼酸 (4-hydroxyboronic acid): 1226 mg / 1.226 g (8.88 mmol, 6.00 equiv)\n"
+        "3. 碳酸鉀 (Potassium carbonate, K2CO3): 870 mg (6.30 mmol, 4.25 equiv)\n"
+        "4. TBAB (Tetrabutylammonium bromide): 239 mg (0.741 mmol, 0.5 equiv)\n"
+        "5. 催化劑 Pd(OAc)2: 3.3 mg (0.015 mmol, 1.00 mol%)\n"
+        "6. 配體 SPhos: 9.1 mg (0.022 mmol, 1.50 mol%)\n"
+        "7. 內標物 1,3,5-trimethoxybenzene: 82.3 mg (0.49 mmol, 0.33 equiv)\n\n"
         "【回答原則】\n"
-        "1. 請針對使用者的提問以及當前投料參數（如 TPE-Br 核心、4-羥基苯硼酸、催化劑、鹼、溶劑等）給出專業、簡明且精準的實驗建議與化學機制分析。\n"
-        "2. 【重要約束】當使用者討論 Suzuki 反應的參數、鹼量、催化劑或產率失敗原因時，請專注在 Suzuki 反應本身的有機合成機制（如氧化加成、轉金屬、還原消除、鹼作用機制等）。\n"
-        "3. 【嚴禁事項】除非使用者在問題中主動提及「MIM」、「拓樸」、「2D MIM」或「2D 聚合物」，否則回答中【絕對不要】提到任何 2D MIM、拓樸聚合或分子印跡等相關詞彙與概念。"
+        "1. 當使用者提問或變動投料量（如 TPE-Br、4-羥基苯硼酸、K2CO3 等）時，請務必先將使用者的數據與上述【文獻標準實驗基準】進行莫耳比（equiv）與比例的對照分析，評估過量或不足對產率及副反應的影響。\n"
+        "2. 專注於 Suzuki 偶聯反應本身的化學機制（氧化加成、轉金屬、還原消除、鹼作用機制、相轉移催化等）。\n"
+        "3. 【嚴禁事項】除非使用者問題中主動提及「MIM」、「拓樸」、「2D MIM」或「2D 聚合物」，否則【絕對不要】提到任何 MIM、拓樸聚合或分子印跡等概念。"
     )
     
     user_context = (
-        f"【目前實驗投料參數】\n"
-        f"- TPE-Br: {data.tpe_br} mg\n"
+        f"【目前使用者設定投料】\n"
+        f"- TPE-Br 核心: {data.tpe_br} mg\n"
         f"- 4-羥基苯硼酸: {data.b_acid} mg\n\n"
         f"【使用者提問】\n{data.prompt}"
     )
@@ -114,7 +123,6 @@ async def ai_consult(data: ConsultRequest):
         ]
     }
 
-    # 最新備援模型優先順序表（已移除過時的 2.5，加入 3.6）
     candidate_models = [
         "gemini-3.5-flash-lite",
         "gemini-3.5-flash",
