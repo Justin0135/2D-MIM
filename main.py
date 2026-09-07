@@ -42,22 +42,34 @@ def read_root():
     return {"status": "online", "message": "Backend API is running!"}
 
 
-# 4. ML 產率預測接口
+# 4. ML 產率預測接口 (多特徵 + 預設值防爆版)
 class PredictRequest(BaseModel):
-    tpe_br: float
-    b_acid: float
+    tpe_br: float = 960.0
+    b_acid: float = 1226.0
+    pd_oac2: float = 3.3
+    sphos: float = 9.1
+    k2co3: float = 870.0
+    tbab: float = 239.0
+    solvent_volume: float = 18.3
 
 @app.post("/predict")
 def predict_yield(data: PredictRequest):
     mdl = get_model()
     if mdl is None:
         return {"predicted_yield": 85.0, "status": "fallback"}
-    
+
     try:
+        # ⚠️ 這裡的鍵名 (欄位名稱) 必須與訓練 suzuki_model.pkl 時的特徵欄位完全一致
         input_data = pd.DataFrame([{
             "tpe_br": data.tpe_br,
-            "b_acid": data.b_acid
+            "b_acid": data.b_acid,
+            "pd_oac2": data.pd_oac2,
+            "sphos": data.sphos,
+            "k2co3": data.k2co3,
+            "tbab": data.tbab,
+            "solvent_volume": data.solvent_volume
         }])
+        
         prediction = mdl.predict(input_data)[0]
         return {"predicted_yield": float(prediction), "status": "success"}
     except Exception as e:
