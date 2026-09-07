@@ -289,15 +289,19 @@
         const k2co3Eq = ((k2co3 / 138.21) / tpeMmol).toFixed(2);
 
         // 3. 鈀黑風險評估 (SPhos / Pd 莫耳比)
-        const lToPdRatio = pdMmol > 0 ? (sphosMmol / pdMmol) : 0;
-        let riskHtml = '';
-        if (lToPdRatio >= 1.8) {
-            riskHtml = '<span class="text-emerald-400">10</span> (安全)';
-        } else if (lToPdRatio >= 1.2) {
-            riskHtml = '<span class="text-amber-400">50</span> (中度)';
-        } else {
-            riskHtml = '<span class="text-red-400">85</span> (高風險)';
-        }
+const lToPdRatio = pdMmol > 0 ? (sphosMmol / pdMmol) : 0;
+let riskHtml = '';
+
+if (lToPdRatio >= 1.4) {
+    // 文獻標準條件 (L:Pd 通常為 1.5)，鈀催化劑保護良好
+    riskHtml = '<span class="text-emerald-400">15%</span> (安全)';
+} else if (lToPdRatio >= 1.0) {
+    // 配體稍顯不足 (1.0 <= L:Pd < 1.4)
+    riskHtml = '<span class="text-amber-400">40%</span> (中度)';
+} else {
+    // 配體嚴重不足 (L:Pd < 1.0)，極易聚集生成鈀黑
+    riskHtml = '<span class="text-red-400">85%</span> (高風險)';
+}
 
         // 寫入鈀黑風險與硼酸當量卡片
         const riskElem = document.getElementById('riskMetric');
