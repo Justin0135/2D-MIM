@@ -5,3 +5,4 @@ httpx
 joblib
 pandas
 scikit-learn
+supabase
