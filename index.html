@@ -18,6 +18,15 @@
   
   <!-- Supabase JS SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    /* Markdown 樣式細節修正 */
+    .prose p { margin-bottom: 0.5rem; }
+    .prose ul { list-style-type: disc; padding-left: 1.25rem; margin-bottom: 0.5rem; }
+    .prose ol { list-style-type: decimal; padding-left: 1.25rem; margin-bottom: 0.5rem; }
+    .prose strong { color: #38bdf8; }
+    .prose code { background: rgba(255,255,255,0.1); padding: 0.1rem 0.3rem; border-radius: 0.2rem; font-family: monospace; }
+  </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-8 font-sans">
 
@@ -28,9 +37,9 @@
         <h1 class="text-2xl md:text-3xl font-bold text-white flex items-center gap-3">
           <i class="fa-solid fa-flask text-emerald-400"></i>
           Suzuki 反應評估 <sup>1</sup>H-NMR 光譜控制台
-          <span class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full font-mono">v10.0 雲端 AI 版</span>
+          <span class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full font-mono">v11.0 雲端 DB & AI 整合版</span>
         </h1>
-        <p class="text-slate-400 text-sm mt-1">整合 TPE-4OH 四重偶聯動力學、鈀黑風險評估、1H-NMR 擬真與雲端 Gemini AI 診斷</p>
+        <p class="text-slate-400 text-sm mt-1">整合 TPE-4OH 四重偶聯動力學、鈀黑風險評估、Supabase 歷史數據比對與雲端 Gemini AI 診斷</p>
       </div>
       <div class="flex gap-3">
         <button onclick="saveExperimentToDB()" class="bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 font-bold px-4 py-2.5 rounded-xl transition duration-200 flex items-center justify-center gap-2 text-sm">
@@ -69,11 +78,11 @@
                 </div>
                 <div>
                   <label class="text-slate-400 block mb-0.5">Pd(OAc)2 (mg)</label>
-                  <input id="pdInput" type="number" value="3.3" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono">
+                  <input id="pdInput" type="number" step="0.1" value="3.3" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono">
                 </div>
                 <div>
                   <label class="text-slate-400 block mb-0.5">SPhos (mg)</label>
-                  <input id="sphosInput" type="number" value="9.1" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono">
+                  <input id="sphosInput" type="number" step="0.1" value="9.1" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono">
                 </div>
               </div>
             </div>
@@ -92,7 +101,7 @@
                 </div>
                 <div>
                   <label class="text-slate-400 block mb-0.5">1,3,5-三甲氧基苯</label>
-                  <input id="isInput" type="number" value="82.3" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono">
+                  <input id="isInput" type="number" step="0.1" value="82.3" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono">
                 </div>
               </div>
             </div>
@@ -103,7 +112,7 @@
               <div class="grid grid-cols-2 gap-2 text-xs">
                 <div>
                   <label class="text-slate-400 block mb-0.5">總體積 (mL)</label>
-                  <input id="volInput" type="number" value="18" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono">
+                  <input id="volInput" type="number" step="0.1" value="18.3" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono">
                 </div>
                 <div>
                   <label class="text-slate-400 block mb-0.5">油溫 (°C)</label>
@@ -117,18 +126,22 @@
           <!-- 右側擬真圖表與預測指標區塊 -->
           <div class="space-y-4">
             
-            <!-- 指標摘要卡片 -->
-            <div class="grid grid-cols-3 gap-2 text-center text-xs">
+            <!-- 指標摘要卡片 (4 欄版) -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-center text-xs">
               <div class="bg-slate-800/50 border border-slate-700/50 p-2.5 rounded-xl">
-                <span class="text-slate-400 block">ML 預測產率</span>
+                <span class="text-slate-400 block text-[11px]">ML 預測產率</span>
                 <span id="predictedYieldMetric" class="text-base font-bold text-slate-500">待計算</span>
               </div>
               <div class="bg-slate-800/50 border border-slate-700/50 p-2.5 rounded-xl">
-                <span class="text-slate-400 block">鈀黑風險</span>
+                <span class="text-slate-400 block text-[11px]">歷史最相近數據</span>
+                <span id="historyMatchMetric" class="text-base font-bold text-slate-500">待比對</span>
+              </div>
+              <div class="bg-slate-800/50 border border-slate-700/50 p-2.5 rounded-xl">
+                <span class="text-slate-400 block text-[11px]">鈀黑風險</span>
                 <span id="riskMetric" class="text-base font-bold text-slate-500">待評估</span>
               </div>
               <div class="bg-slate-800/50 border border-slate-700/50 p-2.5 rounded-xl">
-                <span class="text-slate-400 block">硼酸當量</span>
+                <span class="text-slate-400 block text-[11px]">硼酸當量</span>
                 <span id="eqMetric" class="text-base font-bold text-slate-500">---</span>
               </div>
             </div>
@@ -144,7 +157,7 @@
               <div class="h-44 w-full">
                 <canvas id="nmrChart"></canvas>
               </div>
-              <div id="spectrumDetails" class="mt-2 text-[11px] text-slate-400 font-mono hidden">
+              <div id="spectrumDetails" class="mt-2 text-[11px] text-slate-400 font-mono hidden space-y-0.5">
                 <p>📍 內標特徵峰 (1,3,5-三甲氧基苯): <span class="text-emerald-400">Ar-H: δ 6.08 | OCH3: δ 3.76</span></p>
                 <p>🎯 100% 產率理論對比積分比: <span class="text-emerald-400">產物 6.62 ppm (8H) / 內標 6.08 ppm (3H) = 7.99 : 1.00</span></p>
               </div>
@@ -157,7 +170,7 @@
         <!-- 現場優化診斷 -->
         <div class="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-4 backdrop-blur-sm">
           <h3 class="text-xs font-semibold text-white mb-2 flex items-center gap-2 border-b border-slate-700/50 pb-1.5">
-            <i class="fa-solid fa-list-check text-emerald-400"></i> 現場優化診斷
+            <i class="fa-solid fa-list-check text-emerald-400"></i> 現場優化診斷與 DB 比對報告
           </h3>
           <ul id="diagnosticList" class="space-y-1.5 text-xs">
             <li class="p-2 text-slate-500 text-center font-mono">尚未點擊「執行分析」產出診斷報告</li>
@@ -180,15 +193,15 @@
         </div>
 
         <!-- AI 對話內容紀錄區 -->
-        <div id="chatBox" class="flex-1 overflow-y-auto space-y-3 pr-2 text-xs text-slate-300 font-mono whitespace-pre-wrap leading-relaxed">
+        <div id="chatBox" class="flex-1 overflow-y-auto space-y-3 pr-2 text-xs text-slate-300 font-mono leading-relaxed">
           <div class="p-2 bg-sky-500/10 border border-sky-500/20 rounded-lg text-sky-300">
-            👋 你好！我是你的 Suzuki 偶聯與 2D MIM 拓樸聚合 AI 導師。你可以隨時在下方輸入任何問題與我交流。
+            👋 你好！我是你的 Suzuki 偶聯反應 AI 導師。你可以隨時在下方輸入任何化學機制或投料問題與我交流。
           </div>
         </div>
 
         <!-- 輸入與發送區塊 -->
         <div class="mt-3 pt-3 border-t border-slate-700/50 flex gap-2 shrink-0">
-          <input id="userAiInput" type="text" placeholder="輸入問題或打招呼..." class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500">
+          <input id="userAiInput" type="text" placeholder="輸入問題（例如：配體不足有什麼風險？）..." class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500">
           <button onclick="askCloudAI()" class="bg-sky-500 hover:bg-sky-600 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs transition duration-200 flex items-center gap-1.5 shrink-0">
             <i class="fa-solid fa-paper-plane"></i> 諮詢 AI
           </button>
@@ -211,6 +224,7 @@
 
     let lastUserPrompt = "";
     let lastAiResponse = "";
+    let latestPredictedYield = 85.0;
     let chartInstance = null;
     let supabaseClient = null;
 
@@ -246,149 +260,173 @@
       });
     }
 
-    // 清理回應內文字的輔助函數
-    function cleanResponseText(text) {
-      if (!text) return "";
-      return text
-        .replace(/\$\$/g, '')
-        .replace(/\$/g, '')
-        .replace(/\\(frac|mathrm|text|left|right|begin|end){.*?}/g, '')
-        .replace(/#{1,6}\s?/g, '')
-        .replace(/\*\*(.*?)\*\*/g, '$1')
-        .replace(/\*(.*?)\*/g, '$1')
-        .replace(/`{1,3}(.*?)(`{1,3})/g, '$1')
-        .replace(/^\s*[\-\*]\s+/gm, '• ')
-        .trim();
-    }
-
     // ==========================================
-    // 2. 主分析與動態計算 qNMR 光譜函式
+    // 2. 主分析、ML 預測、Supabase 比對與動態 qNMR 光譜
     // ==========================================
     async function calculateMetrics(isClick = false) {
-        if (!isClick) return;
+      if (!isClick) return;
 
-        // 1. 完整讀取面板上所有的投料參數與重量 (mg, mL, °C)
-        const tpe = parseFloat(document.getElementById('tpeInput')?.value || 970);
-        const bAcid = parseFloat(document.getElementById('bAcidInput')?.value || 1235);
-        const pd = parseFloat(document.getElementById('pdInput')?.value || 4.4);
-        const sphos = parseFloat(document.getElementById('sphosInput')?.value || 15.6);
-        const k2co3 = parseFloat(document.getElementById('k2co3Input')?.value || 875);
-        const tbab = parseFloat(document.getElementById('tbabInput')?.value || 250);
-        const isIS = parseFloat(document.getElementById('isInput')?.value || 84); // 內標
-        const vol = parseFloat(document.getElementById('volInput')?.value || 18.3);
-        const temp = parseFloat(document.getElementById('tempInput')?.value || 81);
+      // 1. 完整讀取面板上所有的投料參數 (mg, mL, °C)
+      const tpe = parseFloat(document.getElementById('tpeInput')?.value || 960);
+      const bAcid = parseFloat(document.getElementById('bAcidInput')?.value || 1226);
+      const pd = parseFloat(document.getElementById('pdInput')?.value || 3.3);
+      const sphos = parseFloat(document.getElementById('sphosInput')?.value || 9.1);
+      const k2co3 = parseFloat(document.getElementById('k2co3Input')?.value || 870);
+      const tbab = parseFloat(document.getElementById('tbabInput')?.value || 239);
+      const isIS = parseFloat(document.getElementById('isInput')?.value || 82.3);
+      const vol = parseFloat(document.getElementById('volInput')?.value || 18.3);
+      const temp = parseFloat(document.getElementById('tempInput')?.value || 81);
 
-        // 2. 化學莫耳數與當量計算
-        const tpeMmol = tpe / 970.0;
-        const bAcidMmol = bAcid / 137.91;
-        const isMmol = isIS / 168.19;
-        const pdMmol = pd / 224.51;
-        const sphosMmol = sphos / 410.53;
+      // 2. 化學莫耳數與當量計算
+      const tpeMmol = tpe / 648.0;
+      const bAcidMmol = bAcid / 137.91;
+      const isMmol = isIS / 168.19;
+      const pdMmol = pd / 224.51;
+      const sphosMmol = sphos / 410.53;
 
-        const bAcidEq = (bAcidMmol / (tpeMmol * 4)).toFixed(2);
-        const k2co3Eq = ((k2co3 / 138.21) / tpeMmol).toFixed(2);
+      const bAcidEq = (bAcidMmol / (tpeMmol * 4)).toFixed(2);
+      const k2co3Eq = ((k2co3 / 138.21) / tpeMmol).toFixed(2);
 
-        // 3. 鈀黑風險評估 (SPhos / Pd 莫耳比)
-const lToPdRatio = pdMmol > 0 ? (sphosMmol / pdMmol) : 0;
-let riskHtml = '';
+      // 3. 鈀黑風險評估 (SPhos / Pd 莫耳比)
+      const lToPdRatio = pdMmol > 0 ? (sphosMmol / pdMmol) : 0;
+      let riskHtml = '';
 
-if (lToPdRatio >= 1.4) {
-    // 文獻標準條件 (L:Pd 通常為 1.5)，鈀催化劑保護良好
-    riskHtml = '<span class="text-emerald-400">15%</span> (安全)';
-} else if (lToPdRatio >= 1.0) {
-    // 配體稍顯不足 (1.0 <= L:Pd < 1.4)
-    riskHtml = '<span class="text-amber-400">40%</span> (中度)';
-} else {
-    // 配體嚴重不足 (L:Pd < 1.0)，極易聚集生成鈀黑
-    riskHtml = '<span class="text-red-400">85%</span> (高風險)';
-}
+      if (lToPdRatio >= 1.4) {
+        riskHtml = '<span class="text-emerald-400">15%</span> (低)';
+      } else if (lToPdRatio >= 1.0) {
+        riskHtml = '<span class="text-amber-400">40%</span> (中)';
+      } else {
+        riskHtml = '<span class="text-rose-400">85%</span> (高)';
+      }
 
-        // 寫入鈀黑風險與硼酸當量卡片
-        const riskElem = document.getElementById('riskMetric');
-        if (riskElem) riskElem.innerHTML = riskHtml;
+      const riskElem = document.getElementById('riskMetric');
+      if (riskElem) riskElem.innerHTML = riskHtml;
 
-        const eqElem = document.getElementById('eqMetric');
-        if (eqElem) eqElem.innerHTML = `<span class="text-emerald-400">${bAcidEq}</span> eq`;
+      const eqElem = document.getElementById('eqMetric');
+      if (eqElem) eqElem.innerHTML = `<span class="text-emerald-400">${bAcidEq}</span> eq`;
 
-        // 4. 呼叫後端 ML 預測產率 API (傳送完整參數)
-        let predYield = 85.0;
-        try {
-            const response = await fetch(`${BACKEND_URL}/predict`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    tpe_br: tpe, 
-                    b_acid: bAcid,
-                    pd_oac2: pd,
-                    sphos: sphos,
-                    k2co3: k2co3,
-                    tbab: tbab,
-                    temp: temp,
-                    volume: vol
-                })
-            });
+      // 4. 呼叫後端 ML 預測產率 API
+      let predYield = 85.0;
+      try {
+        const response = await fetch(`${BACKEND_URL}/predict`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            tpe_br: tpe, 
+            b_acid: bAcid,
+            pd_oac2: pd,
+            sphos: sphos,
+            k2co3: k2co3,
+            tbab: tbab,
+            solvent_volume: vol
+          })
+        });
 
-            if (response.ok) {
-                const resData = await response.json();
-                predYield = resData.predicted_yield ? parseFloat(resData.predicted_yield) : 85.0;
-            }
-        } catch (err) {
-            console.warn("後端預測連線超時，使用預設值:", err);
+        if (response.ok) {
+          const resData = await response.json();
+          predYield = resData.predicted_yield ? parseFloat(resData.predicted_yield) : 85.0;
         }
+      } catch (err) {
+        console.warn("後端預測連線超時，使用預設值:", err);
+      }
 
-        // 更新 ML 預測產率顯示
-        const yieldElem = document.getElementById('predictedYieldMetric') || document.getElementById('yieldMetric');
-        if (yieldElem) yieldElem.innerHTML = `<span class="text-emerald-400">${predYield.toFixed(1)}%</span>`;
+      latestPredictedYield = predYield;
+      const yieldElem = document.getElementById('predictedYieldMetric');
+      if (yieldElem) yieldElem.innerHTML = `<span class="text-emerald-400">${predYield.toFixed(1)}%</span>`;
 
-        // 5. 動態生成 1H-NMR 光譜數據 (依據真實 mg 秤重與莫耳比例換算峰高)
-        if (typeof chartInstance !== 'undefined' && chartInstance) {
-            const productMmol = tpeMmol * (predYield / 100.0);
-            const isArHBaseHeight = 100;
+      // 5. 呼叫 Supabase 歷史數據比對 API (`/compare-history`)
+      let matchInfoHtml = `<li class="p-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-400">尚未連接 Supabase 歷史紀錄</li>`;
+      const matchElem = document.getElementById('historyMatchMetric');
+
+      try {
+        const histResp = await fetch(`${BACKEND_URL}/compare-history`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tpe_br: tpe,
+            b_acid: bAcid,
+            pd_oac2: pd,
+            sphos: sphos,
+            k2co3: k2co3,
+            tbab: tbab,
+            solvent_volume: vol
+          })
+        });
+
+        if (histResp.ok) {
+          const histData = await histResp.json();
+          if (histData.status === 'success' && histData.has_match) {
+            const matchData = histData.match_data;
+            const simPct = histData.similarity_percent;
             
-            // 依據內標與產物的莫耳數及質子數計算相對峰高
-            const productPeakHeight = isMmol > 0 
-                ? (productMmol * 8) / (isMmol * 3) * isArHBaseHeight 
-                : 85;
+            if (matchElem) matchElem.innerHTML = `<span class="text-sky-400">${simPct}%</span>`;
 
-            const isOCH3Height = isArHBaseHeight * 3.0;
-
-            const newData = Array(100).fill(0);
-            newData[34] = Math.min(productPeakHeight, 150); // δ 6.62 產物芳香環峰
-            newData[39] = isArHBaseHeight;                 // δ 6.08 內標 Ar-H 峰
-            newData[62] = Math.min(isOCH3Height, 180);      // δ 3.76 內標 OCH3 峰
-
-            chartInstance.data.datasets[0].data = newData;
-            chartInstance.update();
-        }
-
-        // 6. 更新現場診斷清單
-        const list = document.getElementById('diagnosticList');
-        if (list) {
-            list.innerHTML = `
-                <li class="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-300">
-                    💡 <strong>K₂CO₃ 當量</strong>：符合標準（約 ${k2co3Eq} eq）。
-                </li>
-                <li class="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-300">
-                    💡 <strong>硼酸當量</strong>：充裕（約 ${bAcidEq} eq），滿足四重偶聯安全閾值。
-                </li>
+            matchInfoHtml = `
+              <li class="p-2 bg-sky-500/10 border border-sky-500/20 rounded-lg text-sky-300">
+                🔍 <strong>歷史最相近實驗比對</strong>（相似度 ${simPct}%）：<br>
+                時間: ${matchData.created_at} | 歷史產率: <span class="font-bold text-emerald-400">${parseFloat(matchData.yield_percent).toFixed(1)}%</span><br>
+                <span class="text-[11px] text-slate-400">歷史投料: TPE-Br ${matchData.tpe_br}mg, 硼酸 ${matchData.b_acid}mg, Pd ${matchData.pd_oac2}mg, SPhos ${matchData.sphos}mg</span>
+              </li>
             `;
+          } else {
+            if (matchElem) matchElem.innerHTML = `<span class="text-slate-400">無紀錄</span>`;
+            matchInfoHtml = `<li class="p-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-400">Supabase 中尚無可比對的歷史實驗數據。</li>`;
+          }
         }
+      } catch (err) {
+        console.warn("歷史比對呼叫異常:", err);
+        if (matchElem) matchElem.innerHTML = `<span class="text-slate-500">連線錯</span>`;
+      }
 
-        // 7. 更新圖表狀態與細節標籤
-        const chartStatus = document.getElementById('chartStatus');
-        if (chartStatus) {
-            chartStatus.innerText = "已生成";
-            chartStatus.className = "text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-mono";
-        }
+      // 6. 動態生成 1H-NMR 光譜數據
+      if (chartInstance) {
+        const productMmol = tpeMmol * (predYield / 100.0);
+        const isArHBaseHeight = 100;
+        
+        const productPeakHeight = isMmol > 0 
+          ? (productMmol * 8) / (isMmol * 3) * isArHBaseHeight 
+          : 85;
 
-        const spectrumDetails = document.getElementById('spectrumDetails');
-        if (spectrumDetails) {
-            spectrumDetails.classList.remove('hidden');
-        }
+        const isOCH3Height = isArHBaseHeight * 3.0;
+
+        const newData = Array(100).fill(0);
+        newData[34] = Math.min(productPeakHeight, 150); // δ 6.62 產物芳香環峰
+        newData[39] = isArHBaseHeight;                  // δ 6.08 內標 Ar-H 峰
+        newData[62] = Math.min(isOCH3Height, 180);      // δ 3.76 內標 OCH3 峰
+
+        chartInstance.data.datasets[0].data = newData;
+        chartInstance.update();
+      }
+
+      // 7. 更新現場診斷清單
+      const list = document.getElementById('diagnosticList');
+      if (list) {
+        list.innerHTML = `
+          ${matchInfoHtml}
+          <li class="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-300">
+            💡 <strong>K₂CO₃ 當量</strong>：符合標準（約 ${k2co3Eq} eq）。
+          </li>
+          <li class="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-300">
+            💡 <strong>硼酸當量</strong>：充裕（約 ${bAcidEq} eq），滿足四重偶聯安全閾值。
+          </li>
+        `;
+      }
+
+      // 8. 更新圖表狀態與細節標籤
+      const chartStatus = document.getElementById('chartStatus');
+      if (chartStatus) {
+        chartStatus.innerText = "已生成";
+        chartStatus.className = "text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-mono";
+      }
+
+      const spectrumDetails = document.getElementById('spectrumDetails');
+      if (spectrumDetails) {
+        spectrumDetails.classList.remove('hidden');
+      }
     }
 
     // ==========================================
-    // 3. 獨立 AI 對話發送函數 (對接 Render 後端)
+    // 3. 獨立 AI 對話發送函數 (Marked.js 渲染支援)
     // ==========================================
     async function askCloudAI() {
       const chatBox = document.getElementById('chatBox');
@@ -414,8 +452,8 @@ if (lToPdRatio >= 1.4) {
       chatBox.appendChild(aiLoadingDiv);
       chatBox.scrollTop = chatBox.scrollHeight;
 
-      const tpeVal = document.getElementById('tpeInput')?.value || 970;
-      const bAcidVal = document.getElementById('bAcidInput')?.value || 1235;
+      const tpeVal = document.getElementById('tpeInput')?.value || 960;
+      const bAcidVal = document.getElementById('bAcidInput')?.value || 1226;
 
       try {
         const response = await fetch(`${BACKEND_URL}/ai-consult`, {
@@ -433,15 +471,32 @@ if (lToPdRatio >= 1.4) {
 
         if (response.ok && (data.reply || data.response)) {
           const rawReply = data.reply || data.response;
-          const cleanedReply = cleanResponseText(rawReply);
 
           lastUserPrompt = userText;
-          lastAiResponse = cleanedReply;
+          lastAiResponse = rawReply;
 
           const aiReplyDiv = document.createElement('div');
-          aiReplyDiv.className = "p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-200 whitespace-pre-wrap";
-          aiReplyDiv.innerText = `🤖 Gemini AI：\n${cleanedReply}`;
+          aiReplyDiv.className = "p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-200 prose prose-invert text-xs max-w-none";
+
+          // 使用 marked.parse 將 Markdown 美化渲染，防止文字混亂
+          if (typeof marked !== 'undefined') {
+            aiReplyDiv.innerHTML = `<strong>🤖 Gemini AI：</strong><br>${marked.parse(rawReply)}`;
+          } else {
+            aiReplyDiv.innerText = `🤖 Gemini AI：\n${rawReply}`;
+          }
+
           chatBox.appendChild(aiReplyDiv);
+
+          // 若包含 KaTeX 公式則自動渲染
+          if (window.renderMathInElement) {
+            renderMathInElement(aiReplyDiv, {
+              delimiters: [
+                {left: '$$', right: '$$', display: true},
+                {left: '$', right: '$', display: false}
+              ],
+              throwOnError: false
+            });
+          }
 
           statusTag.innerText = "● 雲端 API 已連線";
           statusTag.className = "text-[11px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full font-mono shrink-0";
@@ -463,57 +518,49 @@ if (lToPdRatio >= 1.4) {
     }
 
     // ==========================================
-// 4. 儲存實驗紀錄至 Supabase (完整欄位抓取版)
-// ==========================================
-async function saveExperimentToDB() {
-    if (!supabaseClient) {
-        alert('Supabase 未完成初始化！');
+    // 4. 儲存實驗紀錄至 Supabase (完整欄位版)
+    // ==========================================
+    async function saveExperimentToDB() {
+      if (!supabaseClient) {
+        alert('Supabase 未完成初始化，請檢查網頁密鑰！');
         return;
-    }
+      }
 
-    // 1. 抓取畫面上所有的投料數據 (若無輸入則帶入預設值)
-    const tpeVal = parseFloat(document.getElementById('tpeInput')?.value || 960);
-    const bAcidVal = parseFloat(document.getElementById('bAcidInput')?.value || 1226);
-    const pdVal = parseFloat(document.getElementById('pdInput')?.value || 3.3);
-    const sphosVal = parseFloat(document.getElementById('sphosInput')?.value || 9.1);
-    const k2co3Val = parseFloat(document.getElementById('k2co3Input')?.value || 870);
-    const tbabVal = parseFloat(document.getElementById('tbabInput')?.value || 239);
-    const volVal = parseFloat(document.getElementById('volInput')?.value || 18.3);
+      // 1. 抓取畫面上所有的投料數據
+      const tpeVal = parseFloat(document.getElementById('tpeInput')?.value || 960);
+      const bAcidVal = parseFloat(document.getElementById('bAcidInput')?.value || 1226);
+      const pdVal = parseFloat(document.getElementById('pdInput')?.value || 3.3);
+      const sphosVal = parseFloat(document.getElementById('sphosInput')?.value || 9.1);
+      const k2co3Val = parseFloat(document.getElementById('k2co3Input')?.value || 870);
+      const tbabVal = parseFloat(document.getElementById('tbabInput')?.value || 239);
+      const volVal = parseFloat(document.getElementById('volInput')?.value || 18.3);
 
-    // 2. 抓取當前預測出來的產率 (若畫面上有文字則提取數字，否則帶入 85.0)
-    let currentYield = 85.0;
-    const yieldElement = document.getElementById('yieldResult') || document.getElementById('predictedYield');
-    if (yieldElement) {
-        const parsed = parseFloat(yieldElement.innerText || yieldElement.value);
-        if (!isNaN(parsed)) currentYield = parsed;
-    }
-
-    // 3. 一次將完整資料寫入 Supabase experiment_logs
-    const { data, error } = await supabaseClient
+      // 2. 一次將完整資料寫入 Supabase experiment_logs
+      const { data, error } = await supabaseClient
         .from('experiment_logs')
         .insert([
-            {
-                experiment_name: `TPE-4OH #${Date.now().toString().slice(-4)}`,
-                tpe_br: tpeVal,
-                b_acid: bAcidVal,
-                pd_oac2: pdVal,
-                sphos: sphosVal,
-                k2co3: k2co3Val,
-                tbab: tbabVal,
-                solvent_volume: volVal,
-                yield_percent: currentYield,
-                purification_note: '完整當量投料測試',
-                ai_feedback: typeof lastAiResponse !== 'undefined' ? lastAiResponse : '無 AI 回覆'
-            }
+          {
+            experiment_name: `TPE-4OH #${Date.now().toString().slice(-4)}`,
+            tpe_br: tpeVal,
+            b_acid: bAcidVal,
+            pd_oac2: pdVal,
+            sphos: sphosVal,
+            k2co3: k2co3Val,
+            tbab: tbabVal,
+            solvent_volume: volVal,
+            yield_percent: latestPredictedYield,
+            purification_note: '完整當量投料測試',
+            ai_feedback: lastAiResponse ? lastAiResponse : '無 AI 回覆'
+          }
         ]);
 
-    if (error) {
+      if (error) {
         alert('寫入失敗：' + error.message);
         console.error('Supabase 錯誤細節：', error);
-    } else {
+      } else {
         alert('✅ 成功將本次「完整投料數據」寫入 Supabase DB！');
+      }
     }
-}
 
     // 頁面載入初始化
     window.onload = function() {
