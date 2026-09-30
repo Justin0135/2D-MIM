@@ -8,6 +8,9 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from supabase import create_client, Client
 
+# 🎯 1. 匯入爬蟲模組 (來自根目錄的 suzuki_crawler.py)
+from suzuki_crawler import fetch_suzuki_literature, sync_to_supabase
+
 app = FastAPI()
 
 # 1. 開放 CORS 跨域存取
@@ -77,7 +80,6 @@ def predict_yield(data: PredictRequest):
         return {"predicted_yield": 85.0, "status": "fallback"}
 
     try:
-        # ⚠️ 這裡的鍵名 (欄位名稱) 必須與訓練 suzuki_model.pkl 時的特徵欄位完全一致
         input_data = pd.DataFrame([{
             "tpe_br": data.tpe_br,
             "b_acid": data.b_acid,
@@ -95,9 +97,8 @@ def predict_yield(data: PredictRequest):
         return {"predicted_yield": 85.0, "status": "error", "detail": str(e)}
 
 
-# 6. Supabase 歷史數據檢索與加權距離比對接口 (新功能)
+# 6. Supabase 歷史數據檢索與加權距離比對接口
 def calculate_param_distance(input_data: dict, history_row: dict) -> float:
-    # 關鍵催化劑與配體給予較高加權值
     weights = {
         "tpe_br": 1.0,
         "b_acid": 1.0,
@@ -129,7 +130,6 @@ def compare_history(data: PredictRequest):
         return {"status": "error", "message": "Supabase 資料庫未連線，請檢查環境變數"}
 
     try:
-        # 從 Supabase experiment_logs 資料庫撈取最近 50 筆紀錄
         response = supabase.table("experiment_logs").select("*").order("created_at", desc=True).limit(50).execute()
         logs = response.data or []
 
@@ -142,15 +142,12 @@ def compare_history(data: PredictRequest):
 
         input_dict = data.model_dump() if hasattr(data, "model_dump") else data.dict()
 
-        # 計算每筆歷史紀錄與當前輸入當量的相對距離
         for log in logs:
             log["_distance"] = calculate_param_distance(input_dict, log)
 
-        # 依照距離排序 (距離越小越相似)
         sorted_logs = sorted(logs, key=lambda x: x["_distance"])
         best_match = sorted_logs[0]
 
-        # 換算為百分比相似度 (Similarity %)
         similarity_pct = max(5.0, round(100.0 - (best_match["_distance"] * 25.0), 1))
 
         return {
@@ -176,7 +173,21 @@ def compare_history(data: PredictRequest):
         return {"status": "error", "message": str(e)}
 
 
-# 7. AI 智慧診斷諮詢接口 (嵌入文獻基準數據 + 多模型自動備援)
+# 🎯 7. 新增爬蟲手動/觸發接口
+@app.post("/trigger-crawler")
+def run_crawler_endpoint():
+    """觸發學術文獻爬蟲，並將結果自動同步至 Supabase knowledge_base 資料表"""
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase 資料庫未連線，無法同步爬蟲數據")
+    try:
+        articles = fetch_suzuki_literature(keyword="Suzuki Miyaura coupling catalyst", max_results=5)
+        sync_to_supabase(articles)
+        return {"status": "success", "message": f"成功抓取並更新 {len(articles)} 筆文獻至 Supabase knowledge_base"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"執行爬蟲失敗: {str(e)}")
+
+
+# 8. AI 智慧診斷諮詢接口 (融入 Supabase RAG 學術文獻檢索)
 class ConsultRequest(BaseModel):
     prompt: str
     tpe_br: float
@@ -193,7 +204,20 @@ async def ai_consult(data: ConsultRequest):
     
     clean_api_key = api_key.strip().strip('"').strip("'")
     
-    # 🎯 融入文獻基準數據的 System Instruction
+    # 🎯 8-1. 從 Supabase knowledge_base 撈取最新 3 筆參考文獻 (RAG 檢索)
+    retrieved_context = ""
+    if supabase:
+        try:
+            res = supabase.table("knowledge_base").select("title, abstract, catalyst_info").order("created_at", desc=True).limit(3).execute()
+            if res.data:
+                retrieved_context = "\n".join([
+                    f"- 論文標題: {item.get('title', '')}\n  摘要: {item.get('abstract', '')[:200]}...\n  提及催化/鹼條件: {item.get('catalyst_info', '')}"
+                    for item in res.data
+                ])
+        except Exception as e:
+            print(f"⚠️ 檢索 Supabase 文獻知識庫失敗: {e}")
+
+    # 🎯 8-2. 組合包含文獻基準與知識庫 RAG 的 System Instruction
     system_instruction = (
         "你是一位有機合成與 Suzuki-Miyaura 偶聯反應專家。\n\n"
         "【文獻標準實驗基準 (Standard Protocol)】\n"
@@ -205,6 +229,15 @@ async def ai_consult(data: ConsultRequest):
         "5. 催化劑 Pd(OAc)2: 3.3 mg (0.015 mmol, 1.00 mol%)\n"
         "6. 配體 SPhos: 9.1 mg (0.022 mmol, 1.50 mol%)\n"
         "7. 內標物 1,3,5-trimethoxybenzene: 82.3 mg (0.49 mmol, 0.33 equiv)\n\n"
+    )
+
+    if retrieved_context:
+        system_instruction += (
+            "【數據庫檢索到的最新 Suzuki 反應學術文獻參考資料】\n"
+            f"{retrieved_context}\n\n"
+        )
+
+    system_instruction += (
         "【回答原則】\n"
         "1. 當使用者提問或變動投料量（如 TPE-Br、4-羥基苯硼酸、K2CO3 等）時，請務必先將使用者的數據與上述【文獻標準實驗基準】進行莫耳比（equiv）與比例的對照分析，評估過量或不足對產率及副反應的影響。\n"
         "2. 專注於 Suzuki 偶聯反應本身的化學機制（氧化加成、轉金屬、還原消除、鹼作用機制、相轉移催化等）。\n"
