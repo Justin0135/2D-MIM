@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from supabase import create_client, Client
 
-# 🎯 1. 匯入爬蟲模組 (來自根目錄的 suzuki_crawler.py)
+# 🎯 1. 匯入爬蟲模組
 from suzuki_crawler import fetch_suzuki_literature, sync_to_supabase
 
 app = FastAPI()
@@ -63,7 +63,7 @@ def read_root():
     return {"status": "online", "message": "Backend API is running!"}
 
 
-# 5. ML 產率預測接口 (多特徵 + 預設值防爆版)
+# 5. ML 產率預測接口
 class PredictRequest(BaseModel):
     tpe_br: float = 960.0
     b_acid: float = 1226.0
@@ -173,10 +173,9 @@ def compare_history(data: PredictRequest):
         return {"status": "error", "message": str(e)}
 
 
-# 🎯 7. 新增爬蟲手動/觸發接口
+# 7. 手動爬蟲接口
 @app.post("/trigger-crawler")
 def run_crawler_endpoint():
-    """觸發學術文獻爬蟲，並將結果自動同步至 Supabase knowledge_base 資料表"""
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase 資料庫未連線，無法同步爬蟲數據")
     try:
@@ -187,7 +186,7 @@ def run_crawler_endpoint():
         raise HTTPException(status_code=500, detail=f"執行爬蟲失敗: {str(e)}")
 
 
-# 8. AI 智慧診斷諮詢接口 (融入 Supabase RAG 學術文獻檢索)
+# 8. AI 智慧診斷諮詢接口 (含自動檢查與防呆爬蟲)
 class ConsultRequest(BaseModel):
     prompt: str
     tpe_br: float
@@ -204,18 +203,16 @@ async def ai_consult(data: ConsultRequest):
     
     clean_api_key = api_key.strip().strip('"').strip("'")
     
-    # 🎯 8-1. 從 Supabase knowledge_base 撈取最新 3 筆參考文獻 (RAG 檢索)
-   retrieved_context = ""
+    retrieved_context = ""
     if supabase:
         try:
             res = supabase.table("knowledge_base").select("title, abstract, catalyst_info").order("created_at", desc=True).limit(3).execute()
             
-            # 💡 懶人自動防呆：如果資料庫完全沒資料，後端自動幫你爬一次並寫入！
+            # 若資料庫為空，自動補發第一次爬蟲
             if not res.data:
-                print("⚠️ 偵測到 knowledge_base 為空，自動觸發首次文獻爬蟲...")
+                print("⚠️️ 偵測到 knowledge_base 為空，自動觸發首次文獻爬蟲...")
                 articles = fetch_suzuki_literature(keyword="Suzuki Miyaura coupling catalyst", max_results=5)
                 sync_to_supabase(articles)
-                # 爬完後重新撈取資料
                 res = supabase.table("knowledge_base").select("title, abstract, catalyst_info").order("created_at", desc=True).limit(3).execute()
 
             if res.data:
@@ -226,7 +223,6 @@ async def ai_consult(data: ConsultRequest):
         except Exception as e:
             print(f"⚠️ 檢索 Supabase 文獻知識庫失敗: {e}")
 
-    # 🎯 8-2. 組合包含文獻基準與知識庫 RAG 的 System Instruction
     system_instruction = (
         "你是一位有機合成與 Suzuki-Miyaura 偶聯反應專家。\n\n"
         "【文獻標準實驗基準 (Standard Protocol)】\n"
