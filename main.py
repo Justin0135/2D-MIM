@@ -205,10 +205,19 @@ async def ai_consult(data: ConsultRequest):
     clean_api_key = api_key.strip().strip('"').strip("'")
     
     # 🎯 8-1. 從 Supabase knowledge_base 撈取最新 3 筆參考文獻 (RAG 檢索)
-    retrieved_context = ""
+   retrieved_context = ""
     if supabase:
         try:
             res = supabase.table("knowledge_base").select("title, abstract, catalyst_info").order("created_at", desc=True).limit(3).execute()
+            
+            # 💡 懶人自動防呆：如果資料庫完全沒資料，後端自動幫你爬一次並寫入！
+            if not res.data:
+                print("⚠️ 偵測到 knowledge_base 為空，自動觸發首次文獻爬蟲...")
+                articles = fetch_suzuki_literature(keyword="Suzuki Miyaura coupling catalyst", max_results=5)
+                sync_to_supabase(articles)
+                # 爬完後重新撈取資料
+                res = supabase.table("knowledge_base").select("title, abstract, catalyst_info").order("created_at", desc=True).limit(3).execute()
+
             if res.data:
                 retrieved_context = "\n".join([
                     f"- 論文標題: {item.get('title', '')}\n  摘要: {item.get('abstract', '')[:200]}...\n  提及催化/鹼條件: {item.get('catalyst_info', '')}"
