@@ -233,39 +233,45 @@
     }
 
     // 初始化空白圖表
-    function initChart() {
-      const ctx = document.getElementById('nmrChart').getContext('2d');
-      chartInstance = new Chart(ctx, {
+function initChart() {
+    const ctx = document.getElementById('nmrChart').getContext('2d');
+    chartInstance = new Chart(ctx, {
         type: 'line',
         data: {
-          labels: Array.from({length: 100}, (_, i) => (10 - i * 0.1).toFixed(1)),
-          datasets: [{
-            label: '強度 (Intensity)',
-            data: Array(100).fill(0),
-            borderColor: '#10b981',
-            borderWidth: 1.5,
-            pointRadius: 0,
-            fill: false
-          }]
+            labels: Array.from({length: 100}, (_, i) => (10 - i * 0.1).toFixed(1)),
+            datasets: [{
+                label: '強度 (Intensity)',
+                data: Array(100).fill(0),
+                borderColor: '#10b981',
+                borderWidth: 1.5,
+                pointRadius: 0,
+                fill: false
+            }]
         },
         options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-              x: { 
-                  grid: { color: '#334155' }, 
-                  ticks: { 
-                      color: '#94a3b8',
-                      // 可以選填：設定大約每隔 10 個點顯示一個標籤，避免數字擠在一起
-                      callback: function(val, index) {
-                          return index % 10 === 0 ? this.getLabelForValue(val) : '';
-                      }
-                  } 
-              },
-              y: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } }
-          },
-          plugins: { legend: { display: false } }
-      }
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: { 
+                    grid: { color: '#334155' }, 
+                    ticks: { 
+                        color: '#94a3b8',
+                        callback: function(val, index) {
+                            return index % 10 === 0 ? this.getLabelForValue(val) : '';
+                        }
+                    } 
+                },
+                y: { 
+                    grid: { color: '#334155' }, 
+                    ticks: { color: '#94a3b8' } 
+                }
+            },
+            plugins: { 
+                legend: { display: false } 
+            }
+        }
+    });
+}
     // ==========================================
     // 2. 主分析、ML 預測、Supabase 比對與動態 qNMR 光譜
     // ==========================================
