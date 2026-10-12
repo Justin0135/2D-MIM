@@ -252,14 +252,20 @@
           responsive: true,
           maintainAspectRatio: false,
           scales: {
-            x: { reverse: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } },
-            y: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } }
+              x: { 
+                  grid: { color: '#334155' }, 
+                  ticks: { 
+                      color: '#94a3b8',
+                      // 可以選填：設定大約每隔 10 個點顯示一個標籤，避免數字擠在一起
+                      callback: function(val, index) {
+                          return index % 10 === 0 ? this.getLabelForValue(val) : '';
+                      }
+                  } 
+              },
+              y: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } }
           },
           plugins: { legend: { display: false } }
-        }
-      });
-    }
-
+      }
     // ==========================================
     // 2. 主分析、ML 預測、Supabase 比對與動態 qNMR 光譜
     // ==========================================
