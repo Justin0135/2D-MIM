@@ -380,22 +380,29 @@
 
       // 6. 動態生成 1H-NMR 光譜數據
       if (chartInstance) {
-        const productMmol = tpeMmol * (predYield / 100.0);
-        const isArHBaseHeight = 100;
-        
-        const productPeakHeight = isMmol > 0 
-          ? (productMmol * 8) / (isMmol * 3) * isArHBaseHeight 
-          : 85;
-
-        const isOCH3Height = isArHBaseHeight * 3.0;
-
-        const newData = Array(100).fill(0);
-        newData[34] = Math.min(productPeakHeight, 150); // δ 6.62 產物芳香環峰
-        newData[39] = isArHBaseHeight;                  // δ 6.08 內標 Ar-H 峰
-        newData[62] = Math.min(isOCH3Height, 180);      // δ 3.76 內標 OCH3 峰
-
-        chartInstance.data.datasets[0].data = newData;
-        chartInstance.update();
+          const productMmol = tpeMmol * (predYield / 100.0);
+          const isArHBaseHeight = 100;
+      
+          const productPeakHeight = isMmol > 0 
+              ? (productMmol * 8) / (isMmol * 3) * isArHBaseHeight 
+              : 85;
+      
+          const isOCH3Height = isArHBaseHeight * 3.0;
+      
+          const newData = Array(100).fill(0);
+          
+          // 原有的低場區與中場區峰
+          newData[34] = Math.min(productPeakHeight, 150); // δ 6.62 產物芳香環峰
+          newData[39] = isArHBaseHeight;                 // δ 6.08 內標 Ar-H 峰
+          newData[62] = Math.min(isOCH3Height, 180);      // δ 3.76 內標 OCH3 峰
+      
+          // 🆕 新增：高場區（0 ~ 3 ppm）的 TBAB 烷基鏈特徵峰
+          newData[68] = 45; // δ 3.25 附近 (-N-CH2-)
+          newData[86] = 60; // δ 1.40 附近 (-CH2-)
+          newData[91] = 75; // δ 0.95 附近 (-CH3 參重峰)
+      
+          chartInstance.data.datasets[0].data = newData;
+          chartInstance.update();
       }
 
       // 7. 更新現場診斷清單
