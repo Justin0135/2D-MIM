@@ -420,17 +420,33 @@ function initChart() {
       // 7. 更新現場診斷清單
       const list = document.getElementById('diagnosticList');
       if (list) {
-        list.innerHTML = `
-          ${matchInfoHtml}
-          <li class="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-300">
-            💡 <strong>K₂CO₃ 當量</strong>：符合標準（約 ${k2co3Eq} eq）。
-          </li>
-          <li class="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-300">
-            💡 <strong>硼酸當量</strong>：充裕（約 ${bAcidEq} eq），滿足四重偶聯安全閾值。
-          </li>
-        `;
+          // 根據計算出來的 bAcidEq 判斷評估狀態
+          let bAcidStatusHtml = '';
+          const eqNum = parseFloat(bAcidEq);
+      
+          if (eqNum < 4.0) {
+              bAcidStatusHtml = `<li class="p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg text-amber-300">
+                  ⚠️ <strong>硼酸當量</strong>：偏低（約 ${bAcidEq} eq），未達 4 個活性溴點位之完整計量，恐有未反應完全之缺陷結構。
+              </li>`;
+          } else if (eqNum >= 4.0 && eqNum <= 4.3) {
+              bAcidStatusHtml = `<li class="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-300">
+                  💡 <strong>硼酸當量</strong>：最佳化學計量（約 ${bAcidEq} eq），完美對應 TPE-Br 四個溴點位，符合高效率網狀偶合。
+              </li>`;
+          } else {
+              bAcidStatusHtml = `<li class="p-2 bg-blue-500/10 border border-blue-500/20 rounded-lg text-blue-300">
+                  ℹ️ <strong>硼酸當量</strong>：過量（約 ${bAcidEq} eq），雖利於反應完全，但需注意後續過量硼酸之分離純化。
+              </li>`;
+          }
+      
+          list.innerHTML = `
+              ${matchInfoHtml}
+              <li class="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-300">
+                  💡 <strong>K₂CO₃ 當量</strong>：符合標準（約 ${k203Eq || k2co3Eq} eq）。
+              </li>
+              ${bAcidStatusHtml}
+          `;
       }
-
+      
       // 8. 更新圖表狀態與細節標籤
       const chartStatus = document.getElementById('chartStatus');
       if (chartStatus) {
