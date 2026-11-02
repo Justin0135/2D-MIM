@@ -90,7 +90,7 @@ def predict_yield(data: PredictRequest):
     if equiv < 4.0:
         warning = f"當量不足 ({equiv:.2f} eq < 4.0 eq)，反應無法完全進行！"
 
-   if mdl is None:
+    if mdl is None:
         return {
             "predicted_yield": 85.0, 
             "status": "fallback", 
