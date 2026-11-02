@@ -76,8 +76,23 @@ class PredictRequest(BaseModel):
 @app.post("/predict")
 def predict_yield(data: PredictRequest):
     mdl = get_model()
+    
+    # 計算當量檢查
+    tpe_mmol = data.tpe_br / 648.0
+    b_acid_mmol = data.b_acid / 137.93
+    equiv = b_acid_mmol / tpe_mmol if tpe_mmol > 0 else 0
+    
+    warning = None
+    if equiv < 4.0:
+        warning = f"當量不足 ({equiv:.2f} eq < 4.0 eq)，反應無法完全進行！"
+
     if mdl is None:
-        return {"predicted_yield": 85.0, "status": "fallback"}
+        return {
+            "predicted_yield": 85.0, 
+            "status": "fallback", 
+            "boronic_acid_equiv": round(equiv, 2),
+            "warning": warning
+        }
 
     try:
         input_data = pd.DataFrame([{
@@ -91,11 +106,14 @@ def predict_yield(data: PredictRequest):
         }])
         
         prediction = mdl.predict(input_data)[0]
-        return {"predicted_yield": float(prediction), "status": "success"}
+        return {
+            "predicted_yield": float(prediction), 
+            "status": "success",
+            "boronic_acid_equiv": round(equiv, 2),
+            "warning": warning
+        }
     except Exception as e:
-        print(f"預測出錯: {e}")
         return {"predicted_yield": 85.0, "status": "error", "detail": str(e)}
-
 
 # 6. Supabase 歷史數據檢索與加權距離比對接口
 def calculate_param_distance(input_data: dict, history_row: dict) -> float:
