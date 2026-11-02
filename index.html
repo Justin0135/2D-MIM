@@ -392,30 +392,64 @@ function initChart() {
 
       // 6. 動態生成 1H-NMR 光譜數據
       if (chartInstance) {
+          // 根據 TPE-Br 莫耳數與 ML 預測產率計算產物莫耳數
           const productMmol = tpeMmol * (predYield / 100.0);
-          const isArHBaseHeight = 100;
-      
+          const reactantResidualMmol = tpeMmol * (1.0 - predYield / 100.0);
+
+          // 定義基準高度（內標高定為 100）
+          const internalStandardHeight = 100;
+
+          // 讓產物峰高隨著「產物生成量 (productMmol)」動態縮放
+          // 假設內標物莫耳數為 isMmol
           const productPeakHeight = isMmol > 0 
-              ? (productMmol * 8) / (isMmol * 3) * isArHBaseHeight 
-              : 85;
-      
-          const isOCH3Height = isArHBaseHeight * 3.0;
-      
-          const newData = Array(100).fill(0);
-          
-          // 原有的低場區與中場區峰
-          newData[34] = Math.min(productPeakHeight, 150); // δ 6.62 產物芳香環峰
-          newData[39] = isArHBaseHeight;                 // δ 6.08 內標 Ar-H 峰
-          newData[62] = Math.min(isOCH3Height, 180);      // δ 3.76 內標 OCH3 峰
-      
-          // 🆕 新增：高場區（0 ~ 3 ppm）的 TBAB 烷基鏈特徵峰
-          newData[68] = 45; // δ 3.25 附近 (-N-CH2-)
-          newData[86] = 60; // δ 1.40 附近 (-CH2-)
-          newData[91] = 75; // δ 0.95 附近 (-CH3 參重峰)
-      
-          chartInstance.data.datasets[0].data = newData;
-          chartInstance.update();
-      }
+              ? (productMmol / isMmol) * internalStandardHeight * 1.5 
+              : (predYield / 100.0) * 140;
+
+          // 設定 X 軸化學位移（從 10.0 ppm 到 1.0 ppm，取 400 個點以達到平滑曲線效果）
+          const ppmStart = 10.0;
+          const ppmEnd = 1.0;
+          const numPoints = 400;
+          const xValues = [];
+          for (let i = 0; i < numPoints; i++) {
+              xValues.push(ppmStart - (i / (numPoints - 1)) * (ppmStart - ppmEnd));
+          }
+
+         // 定義所有峰的參數：{ pos: 化學位移(ppm), height: 高度(會隨投料/產率變動), width: 半峰寬 }
+        const peaks = [
+            // 🆕 新增：8.5 ~ 9.5 ppm 之間的產物酚羥基 (-OH) 峰 (高度與產物生成量連動)
+            { pos: 9.2, height: Math.min(productPeakHeight * 0.45, 80), width: 0.03 },
+        
+            // 殘留反應物峰 (隨著產率提高而變矮)
+            { pos: 7.5, height: Math.max(2, 60 * (1.0 - predYield / 100.0)), width: 0.04 },
+        
+            // 產物 TPE-PhOH 芳香環峰 (~ 6.8 ~ 7.2 ppm)
+            { pos: 7.12, height: Math.min(productPeakHeight, 150), width: 0.035 },
+            { pos: 6.80, height: Math.min(productPeakHeight * 0.85, 130), width: 0.035 },
+        
+            // 內標物峰 (~ 6.1 ppm Ar-H 與 ~ 3.76 ppm OCH3)
+            { pos: 6.08, height: internalStandardHeight, width: 0.03 },
+            { pos: 3.76, height: internalStandardHeight * 2.5, width: 0.03 },
+        
+            // 高場區 TBAB 烷基鏈特徵峰 (0 ~ 3 ppm)
+            { pos: 3.25, height: 45, width: 0.025 }, // -N-CH2-
+            { pos: 1.40, height: 60, width: 0.03 },  // -CH2-
+            { pos: 0.95, height: 75, width: 0.025 }   // -CH3
+        ];
+
+        // 運用勞侖茲函數（Lorentzian）進行數學疊加，生成平滑曲線
+        const yValues = xValues.map(x => {
+            let intensity = 0;
+            peaks.forEach(peak => {
+                intensity += peak.height / (1 + Math.pow((x - peak.pos) / peak.width, 2));
+            });
+            return intensity;
+        });
+
+        // 更新 Chart.js 圖表數據
+        chartInstance.data.labels = xValues.map(x => x.toFixed(2));
+        chartInstance.data.datasets[0].data = yValues;
+        chartInstance.update();
+    }
 
       // 7. 更新現場診斷清單
       const list = document.getElementById('diagnosticList');
