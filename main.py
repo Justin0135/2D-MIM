@@ -41,17 +41,21 @@ else:
 
 # 3. 全域模型變數 (延遲載入)
 model = None
+model_load_error = None
 
 def get_model():
-    global model
+    global model, model_load_error
     if model is None:
-        MODEL_PATH = "suzuki_model.pkl"
+        MODEL_PATH = "suzuki_model_new.pkl"
         if os.path.exists(MODEL_PATH):
             try:
                 model = joblib.load(MODEL_PATH)
-                print("✅ suzuki_model.pkl 成功載入！")
+                print("✅ suzuki_model_new.pkl 成功載入！")
             except Exception as e:
-                print(f"⚠️ 載入 suzuki_model.pkl 失敗: {e}")
+                model_load_error = str(e)
+                print(f"⚠️ 載入 suzuki_model_new.pkl 失敗: {e}")
+        else:
+            model_load_error = "找不到 suzuki_model_new.pkl 檔案路徑"
     return model
 
 
@@ -86,12 +90,13 @@ def predict_yield(data: PredictRequest):
     if equiv < 4.0:
         warning = f"當量不足 ({equiv:.2f} eq < 4.0 eq)，反應無法完全進行！"
 
-    if mdl is None:
+   if mdl is None:
         return {
             "predicted_yield": 85.0, 
             "status": "fallback", 
             "boronic_acid_equiv": round(equiv, 2),
-            "warning": warning
+            "warning": warning,
+            "load_error": model_load_error  # 👈 讓前端直接顯示為什麼載入失敗
         }
 
     try:
