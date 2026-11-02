@@ -296,7 +296,7 @@ function initChart() {
       const pdMmol = pd / 224.51;
       const sphosMmol = sphos / 410.53;
 
-      const bAcidEq = (bAcidMmol / (tpeMmol * 4)).toFixed(2);
+      const bAcidEq = (bAcidMmol / (tpeMmol)).toFixed(2);
       const k2co3Eq = ((k2co3 / 138.21) / tpeMmol).toFixed(2);
 
       // 3. 鈀黑風險評估 (SPhos / Pd 莫耳比)
