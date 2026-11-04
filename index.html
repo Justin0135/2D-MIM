@@ -506,6 +506,57 @@ function initChart() {
       }
     }
 
+    // 9.計算反應時長與動力學
+    // ⏱️ 反應時長與位阻動力學評估函數
+    function updateReactionKinetics(tpeMmol, pdMass, oilTemp, eqNum) {
+        const PD_MW = 224.51;
+        const pdMmol = pdMass / PD_MW;
+        const pdCatalystRatio = tpeMmol > 0 ? (pdMmol / tpeMmol) * 100 : 0;
+
+        // 基礎時長演算
+        let baseHours = 6.0;
+        if (pdCatalystRatio < 1.5) baseHours += 3.0;
+        if (oilTemp < 75) baseHours *= 1.4;
+    
+        // 若當量偏低，因後續位阻大，時間必須拉長
+        if (eqNum < 4.0) baseHours += 4.0; 
+
+        const estimatedHours = Math.min(Math.max(baseHours, 3.0), 16.0);
+        const minTime = Math.floor(estimatedHours);
+        const maxTime = Math.ceil(estimatedHours + 1);
+
+        // 🎯 核心：【第N個位阻反應較慢】的動態邏輯判斷
+        let stericHtml = "";
+        let badgeClass = "text-emerald-400 bg-emerald-500/10 border-emerald-500/20";
+
+        if (eqNum < 4.0) {
+            badgeClass = "text-amber-400 bg-amber-500/10 border-amber-500/20";
+            stericHtml = `⚠️ <strong>位阻瓶頸警示</strong>：當量不足（${eqNum} eq），反應進行到<strong>第 3 個位阻位置</strong>時就會明顯趨緩甚至停滯，第四個位點難以完全轉化。`;
+        } else if (eqNum >= 4.0 && eqNum < 5.0) {
+            badgeClass = "text-blue-400 bg-blue-500/10 border-blue-500/20";
+            stericHtml = `💡 <strong>位阻動力學分析</strong>：TPE-Br 為四取代立體障礙底物，隨著前幾個偶合完成，<strong>第四個位阻位置反應較慢</strong>，建議將回流時長拉長至 ${minTime} 小時以上以確保完全反應。`;
+        } else {
+            stericHtml = `✨ <strong>位阻動力學分析</strong>：硼酸當量充沛，可有效推動<strong>第四個位阻位置</strong>的緩慢轉化速率，反應效率最佳。`;
+        }
+
+        // 渲染到前端畫面的容器中
+        const container = document.getElementById('reaction-time-result');
+        if (container) {
+            container.innerHTML = `
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-slate-200 font-medium">建議回流反應時長：</span>
+                    <span class="px-2.5 py-0.5 border rounded-md font-mono font-bold ${badgeClass}">
+                        約 ${minTime} ~ ${maxTime} 小時
+                    </span>
+                </div>
+                <p class="text-xs text-slate-300 leading-relaxed mb-2">${stericHtml}</p>
+                <div class="text-xs text-slate-500 font-mono border-t border-slate-800 pt-2 mt-2">
+                    [動力學參數] 催化劑比: ${pdCatalystRatio.toFixed(2)} mol% | 溫控: ${oilTemp}°C | 硼酸當量: ${eqNum} eq
+                </div>
+            `;
+        }
+    }
+
     // ==========================================
     // 3. 獨立 AI 對話發送函數 (Marked.js 渲染支援)
     // ==========================================
