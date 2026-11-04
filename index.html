@@ -37,12 +37,12 @@
         <h1 class="text-2xl md:text-3xl font-bold text-white flex items-center gap-3">
           <i class="fa-solid fa-flask text-emerald-400"></i>
           Suzuki 反應評估 <sup>1</sup>H-NMR 光譜控制台
-          <span class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full font-mono">v11.0 雲端 DB & AI 整合版</span>
+          <span class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full font-mono">v11.1 完整整合版</span>
         </h1>
-        <p class="text-slate-400 text-sm mt-1">整合 TPE-4OH 四重偶聯動力學、鈀黑風險評估、Supabase 歷史數據比對與雲端 Gemini AI 診斷</p>
+        <p class="text-slate-400 text-sm mt-1">整合 TPE-4OH 四重偶聯動力學、位阻瓶頸診斷、Supabase 歷史比對與雲端 AI 智慧助理</p>
       </div>
       <div class="flex gap-3">
-        <button onclick="saveExperimentToDB()" class="bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 font-bold px-4 py-2.5 rounded-xl transition duration-200 flex items-center justify-center gap-2 text-sm">
+        <button onclick="saveExperimentToDB()" class="bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 font-bold px-4 py-2.5 rounded-xl transition duration-200 flex items-center justify-center gap-2 text-sm shadow-lg">
           <i class="fa-solid fa-floppy-disk"></i> 存入 DB
         </button>
         <button onclick="calculateMetrics(true)" class="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold px-6 py-2.5 rounded-xl shadow-lg shadow-emerald-500/20 transition duration-200 flex items-center justify-center gap-2">
@@ -59,49 +59,49 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           
           <!-- 投料區塊 -->
-          <div class="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-5 backdrop-blur-sm space-y-4">
+          <div class="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-5 backdrop-blur-sm space-y-4 shadow-xl">
             <h2 class="text-sm font-semibold text-emerald-400 flex items-center gap-2 border-b border-slate-700/50 pb-2">
               <i class="fa-solid fa-sliders"></i> 反應物與材料稱重設定 (文獻基準)
             </h2>
             
             <!-- 1. 核心反應物與催化劑 -->
             <div class="space-y-2">
-              <p class="text-xs text-sky-400 font-bold">1. 核心反應物與催化劑 (MG)</p>
+              <p class="text-xs text-sky-400 font-bold">1. 核心反應物與催化劑 (mg)</p>
               <div class="grid grid-cols-2 gap-2 text-xs">
                 <div>
                   <label class="text-slate-400 block mb-0.5">TPE-Br 核心</label>
-                  <input id="tpeInput" type="number" value="960" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono">
+                  <input id="tpeInput" type="number" value="960" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono focus:outline-none focus:border-sky-500">
                 </div>
                 <div>
                   <label class="text-slate-400 block mb-0.5">4-羥基苯硼酸</label>
-                  <input id="bAcidInput" type="number" value="1226" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono">
+                  <input id="bAcidInput" type="number" value="1226" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono focus:outline-none focus:border-sky-500">
                 </div>
                 <div>
                   <label class="text-slate-400 block mb-0.5">Pd(OAc)2 (mg)</label>
-                  <input id="pdInput" type="number" step="0.1" value="3.3" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono">
+                  <input id="pdInput" type="number" step="0.1" value="3.3" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono focus:outline-none focus:border-sky-500">
                 </div>
                 <div>
                   <label class="text-slate-400 block mb-0.5">SPhos (mg)</label>
-                  <input id="sphosInput" type="number" step="0.1" value="9.1" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono">
+                  <input id="sphosInput" type="number" step="0.1" value="9.1" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono focus:outline-none focus:border-sky-500">
                 </div>
               </div>
             </div>
 
             <!-- 2. 鹼劑、PTC & NMR 內標 -->
             <div class="space-y-2">
-              <p class="text-xs text-sky-400 font-bold">2. 鹼劑、PTC & NMR 內標 (MG)</p>
+              <p class="text-xs text-sky-400 font-bold">2. 鹼劑、PTC & NMR 內標 (mg)</p>
               <div class="grid grid-cols-3 gap-2 text-xs">
                 <div>
                   <label class="text-slate-400 block mb-0.5">K2CO3</label>
-                  <input id="k2co3Input" type="number" value="870" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono">
+                  <input id="k2co3Input" type="number" value="870" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono focus:outline-none focus:border-sky-500">
                 </div>
                 <div>
                   <label class="text-slate-400 block mb-0.5">TBAB</label>
-                  <input id="tbabInput" type="number" value="239" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono">
+                  <input id="tbabInput" type="number" value="239" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono focus:outline-none focus:border-sky-500">
                 </div>
                 <div>
                   <label class="text-slate-400 block mb-0.5">1,3,5-三甲氧基苯</label>
-                  <input id="isInput" type="number" step="0.1" value="82.3" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono">
+                  <input id="isInput" type="number" step="0.1" value="82.3" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono focus:outline-none focus:border-sky-500">
                 </div>
               </div>
             </div>
@@ -112,11 +112,11 @@
               <div class="grid grid-cols-2 gap-2 text-xs">
                 <div>
                   <label class="text-slate-400 block mb-0.5">總體積 (mL)</label>
-                  <input id="volInput" type="number" step="0.1" value="18.3" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono">
+                  <input id="volInput" type="number" step="0.1" value="18.3" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono focus:outline-none focus:border-sky-500">
                 </div>
                 <div>
                   <label class="text-slate-400 block mb-0.5">油溫 (°C)</label>
-                  <input id="tempInput" type="number" value="81" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono">
+                  <input id="tempInput" type="number" value="81" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-mono focus:outline-none focus:border-sky-500">
                 </div>
               </div>
             </div>
@@ -128,26 +128,26 @@
             
             <!-- 指標摘要卡片 (4 欄版) -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-center text-xs">
-              <div class="bg-slate-800/50 border border-slate-700/50 p-2.5 rounded-xl">
+              <div class="bg-slate-800/50 border border-slate-700/50 p-2.5 rounded-xl shadow-md">
                 <span class="text-slate-400 block text-[11px]">ML 預測產率</span>
                 <span id="predictedYieldMetric" class="text-base font-bold text-slate-500">待計算</span>
               </div>
-              <div class="bg-slate-800/50 border border-slate-700/50 p-2.5 rounded-xl">
+              <div class="bg-slate-800/50 border border-slate-700/50 p-2.5 rounded-xl shadow-md">
                 <span class="text-slate-400 block text-[11px]">歷史最相近數據</span>
                 <span id="historyMatchMetric" class="text-base font-bold text-slate-500">待比對</span>
               </div>
-              <div class="bg-slate-800/50 border border-slate-700/50 p-2.5 rounded-xl">
+              <div class="bg-slate-800/50 border border-slate-700/50 p-2.5 rounded-xl shadow-md">
                 <span class="text-slate-400 block text-[11px]">鈀黑風險</span>
                 <span id="riskMetric" class="text-base font-bold text-slate-500">待評估</span>
               </div>
-              <div class="bg-slate-800/50 border border-slate-700/50 p-2.5 rounded-xl">
+              <div class="bg-slate-800/50 border border-slate-700/50 p-2.5 rounded-xl shadow-md">
                 <span class="text-slate-400 block text-[11px]">硼酸當量</span>
                 <span id="eqMetric" class="text-base font-bold text-slate-500">---</span>
               </div>
             </div>
 
             <!-- 光譜圖表 -->
-            <div class="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-4 backdrop-blur-sm relative">
+            <div class="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-4 backdrop-blur-sm relative shadow-xl">
               <div class="flex justify-between items-center mb-2">
                 <h3 class="text-xs font-semibold text-white flex items-center gap-1.5">
                   <i class="fa-solid fa-chart-line text-emerald-400"></i> 1H-NMR 擬真圖譜
@@ -168,7 +168,7 @@
         </div>
 
         <!-- 現場優化診斷 -->
-        <div class="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-4 backdrop-blur-sm">
+        <div class="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-4 backdrop-blur-sm shadow-xl">
           <h3 class="text-xs font-semibold text-white mb-2 flex items-center gap-2 border-b border-slate-700/50 pb-1.5">
             <i class="fa-solid fa-list-check text-emerald-400"></i> 現場優化診斷與 DB 比對報告
           </h3>
@@ -177,22 +177,21 @@
           </ul>
         </div>
 
-       <!-- ⏱️ 反應時長與動力學評估視窗 -->
-      <div class="p-4 bg-slate-900/60 border border-slate-700/50 rounded-xl shadow-lg mt-4">
-          <div class="flex items-center space-x-2 mb-2 text-cyan-400 font-semibold">
-              <span>⏱️</span>
-              <span>反應時長與動力學評估</span>
+        <!-- ⏱️ 反應時長與動力學評估視窗 -->
+        <div class="p-4 bg-slate-800/50 border border-slate-700/50 rounded-2xl shadow-xl backdrop-blur-sm">
+          <div class="flex items-center space-x-2 mb-2 text-cyan-400 font-semibold text-xs border-b border-slate-700/50 pb-1.5">
+            <i class="fa-solid fa-stopwatch"></i>
+            <span>反應時長與動力學評估 (位阻瓶頸分析)</span>
           </div>
-          <div id="reaction-time-result" class="text-sm text-slate-300 space-y-1">
-              <!-- 動態插入計算結果 -->
-              尚無數據，請調整投料量
+          <div id="reaction-time-result" class="text-xs text-slate-300 space-y-1 font-mono">
+            尚無數據，請點擊上方「執行分析與生成光譜」按鈕
           </div>
-      </div>
+        </div>
 
       </div>
 
       <!-- 右欄：獨立 AI 智慧診斷與對話服務台區塊 -->
-      <div class="lg:col-span-4 bg-slate-800/50 border border-slate-700/50 rounded-2xl p-5 backdrop-blur-sm flex flex-col h-[650px]">
+      <div class="lg:col-span-4 bg-slate-800/50 border border-slate-700/50 rounded-2xl p-5 backdrop-blur-sm flex flex-col h-[680px] shadow-xl">
         
         <!-- 對話框標頭 -->
         <div class="flex items-center justify-between border-b border-slate-700/50 pb-3 mb-3 shrink-0">
@@ -206,15 +205,15 @@
 
         <!-- AI 對話內容紀錄區 -->
         <div id="chatBox" class="flex-1 overflow-y-auto space-y-3 pr-2 text-xs text-slate-300 font-mono leading-relaxed">
-          <div class="p-2 bg-sky-500/10 border border-sky-500/20 rounded-lg text-sky-300">
-            👋 你好！我是你的 Suzuki 偶聯反應 AI 導師。你可以隨時在下方輸入任何化學機制或投料問題與我交流。
+          <div class="p-2.5 bg-sky-500/10 border border-sky-500/20 rounded-xl text-sky-300">
+            👋 你好！我是你的 Suzuki 偶聯反應 AI 導師。有任何合成機制、副產物或程式碼問題都可以隨時問我！
           </div>
         </div>
 
         <!-- 輸入與發送區塊 -->
         <div class="mt-3 pt-3 border-t border-slate-700/50 flex gap-2 shrink-0">
-          <input id="userAiInput" type="text" placeholder="輸入問題（例如：配體不足有什麼風險？）..." class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500">
-          <button onclick="askCloudAI()" class="bg-sky-500 hover:bg-sky-600 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs transition duration-200 flex items-center gap-1.5 shrink-0">
+          <input id="userAiInput" type="text" placeholder="輸入問題（例如：配體不足有什麼風險？）..." class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500 font-mono">
+          <button onclick="askCloudAI()" class="bg-sky-500 hover:bg-sky-600 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs transition duration-200 flex items-center gap-1.5 shrink-0 shadow-md">
             <i class="fa-solid fa-paper-plane"></i> 諮詢 AI
           </button>
         </div>
@@ -245,45 +244,46 @@
     }
 
     // 初始化空白圖表
-function initChart() {
-    const ctx = document.getElementById('nmrChart').getContext('2d');
-    chartInstance = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: Array.from({length: 100}, (_, i) => (10 - i * 0.1).toFixed(1)),
-            datasets: [{
-                label: '強度 (Intensity)',
-                data: Array(100).fill(0),
-                borderColor: '#10b981',
-                borderWidth: 1.5,
-                pointRadius: 0,
-                fill: false
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                x: { 
-                    grid: { color: '#334155' }, 
-                    ticks: { 
-                        color: '#94a3b8',
-                        callback: function(val, index) {
-                            return index % 10 === 0 ? this.getLabelForValue(val) : '';
-                        }
-                    } 
-                },
-                y: { 
-                    grid: { color: '#334155' }, 
-                    ticks: { color: '#94a3b8' } 
-                }
-            },
-            plugins: { 
-                legend: { display: false } 
-            }
-        }
-    });
-}
+    function initChart() {
+      const ctx = document.getElementById('nmrChart').getContext('2d');
+      chartInstance = new Chart(ctx, {
+          type: 'line',
+          data: {
+              labels: Array.from({length: 100}, (_, i) => (10 - i * 0.1).toFixed(1)),
+              datasets: [{
+                  label: '強度 (Intensity)',
+                  data: Array(100).fill(0),
+                  borderColor: '#10b981',
+                  borderWidth: 1.5,
+                  pointRadius: 0,
+                  fill: false
+              }]
+          },
+          options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: {
+                  x: { 
+                      grid: { color: '#334155' }, 
+                      ticks: { 
+                          color: '#94a3b8',
+                          callback: function(val, index) {
+                              return index % 10 === 0 ? this.getLabelForValue(val) : '';
+                          }
+                      } 
+                  },
+                  y: { 
+                      grid: { color: '#334155' }, 
+                      ticks: { color: '#94a3b8' } 
+                  }
+              },
+              plugins: { 
+                  legend: { display: false } 
+              }
+          }
+      });
+    }
+
     // ==========================================
     // 2. 主分析、ML 預測、Supabase 比對與動態 qNMR 光譜
     // ==========================================
@@ -303,12 +303,12 @@ function initChart() {
 
       // 2. 化學莫耳數與當量計算
       const tpeMmol = tpe / 648.0;
-      const bAcidMmol = bAcid / 137.91;
+      const bAcidMmol = bAcid / 137.93;
       const isMmol = isIS / 168.19;
       const pdMmol = pd / 224.51;
       const sphosMmol = sphos / 410.53;
 
-      const bAcidEq = (bAcidMmol / (tpeMmol)).toFixed(2);
+      const bAcidEq = (bAcidMmol / tpeMmol).toFixed(2);
       const k2co3Eq = ((k2co3 / 138.21) / tpeMmol).toFixed(2);
 
       // 3. 鈀黑風險評估 (SPhos / Pd 莫耳比)
@@ -404,20 +404,13 @@ function initChart() {
 
       // 6. 動態生成 1H-NMR 光譜數據
       if (chartInstance) {
-          // 根據 TPE-Br 莫耳數與 ML 預測產率計算產物莫耳數
           const productMmol = tpeMmol * (predYield / 100.0);
-          const reactantResidualMmol = tpeMmol * (1.0 - predYield / 100.0);
-
-          // 定義基準高度（內標高定為 100）
           const internalStandardHeight = 100;
 
-          // 讓產物峰高隨著「產物生成量 (productMmol)」動態縮放
-          // 假設內標物莫耳數為 isMmol
           const productPeakHeight = isMmol > 0 
               ? (productMmol / isMmol) * internalStandardHeight * 1.5 
               : (predYield / 100.0) * 140;
 
-          // 設定 X 軸化學位移（從 10.0 ppm 到 1.0 ppm，取 400 個點以達到平滑曲線效果）
           const ppmStart = 10.0;
           const ppmEnd = 1.0;
           const numPoints = 400;
@@ -426,47 +419,39 @@ function initChart() {
               xValues.push(ppmStart - (i / (numPoints - 1)) * (ppmStart - ppmEnd));
           }
 
-         // 定義所有峰的參數：{ pos: 化學位移(ppm), height: 高度(會隨投料/產率變動), width: 半峰寬 }
-        const peaks = [
-            // 🆕 新增：8.5 ~ 9.5 ppm 之間的產物酚羥基 (-OH) 峰 (高度與產物生成量連動)
-            { pos: 9.2, height: Math.min(productPeakHeight * 0.45, 80), width: 0.03 },
-        
-            // 殘留反應物峰 (隨著產率提高而變矮)
-            { pos: 7.5, height: Math.max(2, 60 * (1.0 - predYield / 100.0)), width: 0.04 },
-        
-            // 產物 TPE-PhOH 芳香環峰 (~ 6.8 ~ 7.2 ppm)
-            { pos: 7.12, height: Math.min(productPeakHeight, 150), width: 0.035 },
-            { pos: 6.80, height: Math.min(productPeakHeight * 0.85, 130), width: 0.035 },
-        
-            // 內標物峰 (~ 6.1 ppm Ar-H 與 ~ 3.76 ppm OCH3)
-            { pos: 6.08, height: internalStandardHeight, width: 0.03 },
-            { pos: 3.76, height: internalStandardHeight * 2.5, width: 0.03 },
-        
-            // 高場區 TBAB 烷基鏈特徵峰 (0 ~ 3 ppm)
-            { pos: 3.25, height: 45, width: 0.025 }, // -N-CH2-
-            { pos: 1.40, height: 60, width: 0.03 },  // -CH2-
-            { pos: 0.95, height: 75, width: 0.025 }   // -CH3
-        ];
+          const peaks = [
+              // 8.5 ~ 9.5 ppm 之間的產物酚羥基 (-OH) 峰
+              { pos: 9.2, height: Math.min(productPeakHeight * 0.45, 80), width: 0.03 },
+              // 殘留反應物峰
+              { pos: 7.5, height: Math.max(2, 60 * (1.0 - predYield / 100.0)), width: 0.04 },
+              // 產物芳香環峰
+              { pos: 7.12, height: Math.min(productPeakHeight, 150), width: 0.035 },
+              { pos: 6.80, height: Math.min(productPeakHeight * 0.85, 130), width: 0.035 },
+              // 內標物峰
+              { pos: 6.08, height: internalStandardHeight, width: 0.03 },
+              { pos: 3.76, height: internalStandardHeight * 2.5, width: 0.03 },
+              // TBAB 特徵峰
+              { pos: 3.25, height: 45, width: 0.025 },
+              { pos: 1.40, height: 60, width: 0.03 },
+              { pos: 0.95, height: 75, width: 0.025 }
+          ];
 
-        // 運用勞侖茲函數（Lorentzian）進行數學疊加，生成平滑曲線
-        const yValues = xValues.map(x => {
-            let intensity = 0;
-            peaks.forEach(peak => {
-                intensity += peak.height / (1 + Math.pow((x - peak.pos) / peak.width, 2));
-            });
-            return intensity;
-        });
+          const yValues = xValues.map(x => {
+              let intensity = 0;
+              peaks.forEach(peak => {
+                  intensity += peak.height / (1 + Math.pow((x - peak.pos) / peak.width, 2));
+              });
+              return intensity;
+          });
 
-        // 更新 Chart.js 圖表數據
-        chartInstance.data.labels = xValues.map(x => x.toFixed(2));
-        chartInstance.data.datasets[0].data = yValues;
-        chartInstance.update();
-    }
+          chartInstance.data.labels = xValues.map(x => x.toFixed(2));
+          chartInstance.data.datasets[0].data = yValues;
+          chartInstance.update();
+      }
 
       // 7. 更新現場診斷清單
       const list = document.getElementById('diagnosticList');
       if (list) {
-          // 根據計算出來的 bAcidEq 判斷評估狀態
           let bAcidStatusHtml = '';
           const eqNum = parseFloat(bAcidEq);
       
@@ -493,7 +478,10 @@ function initChart() {
           `;
       }
       
-      // 8. 更新圖表狀態與細節標籤
+      // 8. 呼叫動態反應時長與動力學評估
+      updateReactionKinetics(tpeMmol, pd, temp, parseFloat(bAcidEq));
+
+      // 9. 更新圖表狀態與細節標籤
       const chartStatus = document.getElementById('chartStatus');
       if (chartStatus) {
         chartStatus.innerText = "已生成";
@@ -506,8 +494,9 @@ function initChart() {
       }
     }
 
-    // 9.計算反應時長與動力學
-    // ⏱️ 反應時長與位阻動力學評估函數
+    // ==========================================
+    // 3. 反應時長與動力學評估函數
+    // ==========================================
     function updateReactionKinetics(tpeMmol, pdMass, oilTemp, eqNum) {
         const PD_MW = 224.51;
         const pdMmol = pdMass / PD_MW;
@@ -558,7 +547,7 @@ function initChart() {
     }
 
     // ==========================================
-    // 3. 獨立 AI 對話發送函數 (Marked.js 渲染支援)
+    // 4. 獨立 AI 對話發送函數 (Marked.js 渲染支援)
     // ==========================================
     async function askCloudAI() {
       const chatBox = document.getElementById('chatBox');
@@ -610,7 +599,6 @@ function initChart() {
           const aiReplyDiv = document.createElement('div');
           aiReplyDiv.className = "p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-200 prose prose-invert text-xs max-w-none";
 
-          // 使用 marked.parse 將 Markdown 美化渲染，防止文字混亂
           if (typeof marked !== 'undefined') {
             aiReplyDiv.innerHTML = `<strong>🤖 Gemini AI：</strong><br>${marked.parse(rawReply)}`;
           } else {
@@ -619,7 +607,6 @@ function initChart() {
 
           chatBox.appendChild(aiReplyDiv);
 
-          // 若包含 KaTeX 公式則自動渲染
           if (window.renderMathInElement) {
             renderMathInElement(aiReplyDiv, {
               delimiters: [
@@ -650,7 +637,7 @@ function initChart() {
     }
 
     // ==========================================
-    // 4. 儲存實驗紀錄至 Supabase (完整欄位版)
+    // 5. 儲存實驗紀錄至 Supabase
     // ==========================================
     async function saveExperimentToDB() {
       if (!supabaseClient) {
@@ -658,7 +645,6 @@ function initChart() {
         return;
       }
 
-      // 1. 抓取畫面上所有的投料數據
       const tpeVal = parseFloat(document.getElementById('tpeInput')?.value || 960);
       const bAcidVal = parseFloat(document.getElementById('bAcidInput')?.value || 1226);
       const pdVal = parseFloat(document.getElementById('pdInput')?.value || 3.3);
@@ -667,7 +653,6 @@ function initChart() {
       const tbabVal = parseFloat(document.getElementById('tbabInput')?.value || 239);
       const volVal = parseFloat(document.getElementById('volInput')?.value || 18.3);
 
-      // 2. 一次將完整資料寫入 Supabase experiment_logs
       const { data, error } = await supabaseClient
         .from('experiment_logs')
         .insert([
