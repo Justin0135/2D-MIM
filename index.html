@@ -124,9 +124,9 @@
           </div>
 
           <!-- 右側擬真圖表與預測指標區塊 -->
-          <div class="space-y-4">
+          <div class="space-y-5">
             
-            <!-- 指標摘要卡片 (4 欄版) -->
+            <!-- 指標摘要卡片 (5 欄版) -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-center text-xs">
               <div class="bg-slate-800/50 border border-slate-700/50 p-2.5 rounded-xl">
                 <span class="text-slate-400 block text-[11px]">ML 預測產率</span>
@@ -139,6 +139,16 @@
               <div class="bg-slate-800/50 border border-slate-700/50 p-2.5 rounded-xl">
                 <span class="text-slate-400 block text-[11px]">鈀黑風險</span>
                 <span id="riskMetric" class="text-base font-bold text-slate-500">待評估</span>
+              </div>
+              <div class="p-4 bg-slate-900/60 border border-slate-700/50 rounded-xl shadow-lg mt-4">
+                  <div class="flex items-center space-x-2 mb-2 text-cyan-400 font-semibold">
+                      <span>⏱️</span>
+                      <span>反應時長與動力學評估</span>
+                  </div>
+                  <div id="reaction-time-result" class="text-sm text-slate-300 space-y-1">
+                      <!-- 動態插入計算結果 -->
+                      尚無數據，請調整投料量
+                  </div>
               </div>
               <div class="bg-slate-800/50 border border-slate-700/50 p-2.5 rounded-xl">
                 <span class="text-slate-400 block text-[11px]">硼酸當量</span>
